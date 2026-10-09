@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, blinkmacsystemfont, "Segoe UI", roboto, "Helvetica Neue", arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+@layer base {
+  :root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply text-slate-900 antialiased font-sans transition-colors duration-500 bg-[#f7fbf8];
+    background-image:
+      radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.12) 0px, transparent 45%),
+      radial-gradient(at 100% 0%, rgba(5, 150, 105, 0.10) 0px, transparent 45%),
+      radial-gradient(at 100% 100%, rgba(20, 184, 166, 0.08) 0px, transparent 45%),
+      radial-gradient(at 0% 100%, rgba(4, 120, 87, 0.06) 0px, transparent 45%);
+    min-height: 100vh;
+    padding-top: var(--sat);
+    padding-bottom: var(--sab);
+  }
+}
+
+@layer components {
+  /* Glassmorphism surfaces */
+  .glass {
+    @apply bg-white/80 backdrop-blur-2xl border border-white/60;
+    box-shadow: 0 10px 30px rgba(16, 185, 129, 0.05);
+  }
+
+  .floating-nav-container {
+    @apply fixed top-2.5 sm:top-6 md:top-8 left-0 right-0 z-50 flex justify-center px-3 sm:px-6 md:px-8 pointer-events-none;
+  }
+
+  .floating-nav {
+    @apply pointer-events-auto w-full max-w-7xl rounded-2xl sm:rounded-3xl md:rounded-[2.5rem] px-3.5 sm:px-6 md:px-10 h-14 sm:h-18 md:h-22 flex items-center justify-between transition-all duration-500;
+    @apply bg-white/85 backdrop-blur-xl border border-white/70;
+    box-shadow: 0 12px 40px rgba(16, 185, 129, 0.09);
+    outline: 1px solid rgba(0, 0, 0, 0.04);
+  }
+
+  .gradient-text {
+    @apply text-transparent bg-clip-text bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-700 font-extrabold;
+  }
+}
