@@ -59,9 +59,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Invalid credentials" }, { status: 401 });
     }
 
-    const tokenVersion = typeof user.tokenVersion === "number" ? user.tokenVersion : 0;
-    const accessToken = generateAccessToken(user._id.toString(), user.role, tokenVersion);
-    const refreshToken = generateRefreshToken(user._id.toString(), user.role, tokenVersion);
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
 
     user.refreshToken = refreshToken;
     await user.save();
@@ -103,3 +102,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: "Internal server error" }, { status: 500 });
   }
 }
+
