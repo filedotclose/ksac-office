@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -6,12 +6,13 @@ import { IUser } from "@/types/user";
 import Navbar from "@/components/Navbar";
 import StudentEventProposals from "@/components/dashboard/StudentEventProposals";
 import DeanEventController from "@/components/dashboard/DeanEventController";
+import FICViewController from "@/components/dashboard/FICViewController";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<IUser | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeView, setActiveView] = useState<"controller" | "builder">("controller");
+  const [activeView, setActiveView] = useState<"controller" | "fic" | "builder">("controller");
 
   useEffect(() => {
     async function loadUser() {
@@ -25,6 +26,8 @@ export default function DashboardPage() {
         setUser(data.user);
         if (data.user?.role === "dean" || data.user?.role === "admin") {
           setActiveView("controller");
+        } else if (data.user?.role === "fic") {
+          setActiveView("fic");
         } else {
           setActiveView("builder");
         }
@@ -52,6 +55,7 @@ export default function DashboardPage() {
   }
 
   const isDeanOrAdmin = user.role === "dean" || user.role === "admin";
+  const isFIC = user.role === "fic";
   const authorizedSocieties = Array.isArray(user.societyPositions) && user.societyPositions.length > 0
     ? user.societyPositions
     : user.society
@@ -63,7 +67,7 @@ export default function DashboardPage() {
       <Navbar user={user} onLogout={() => router.replace("/login")} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {/* Role toggle for Dean / Admin */}
+        {/* Institutional Authority Navigation for Dean / Admin */}
         {isDeanOrAdmin && (
           <div className="mb-6 flex items-center justify-between bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 shadow-2xs">
             <div className="flex items-center gap-2">
@@ -75,7 +79,17 @@ export default function DashboardPage() {
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                 }`}
               >
-                Dean Controller &amp; Department Mailer
+                Dean Controller &amp; Mailer
+              </button>
+              <button
+                onClick={() => setActiveView("fic")}
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
+                  activeView === "fic"
+                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                }`}
+              >
+                FIC Review Mode
               </button>
               <button
                 onClick={() => setActiveView("builder")}
@@ -94,9 +108,11 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* View switching */}
+        {/* View switching based on role and selected view */}
         {isDeanOrAdmin && activeView === "controller" ? (
           <DeanEventController />
+        ) : (isDeanOrAdmin && activeView === "fic") || isFIC ? (
+          <FICViewController user={user} />
         ) : (
           <StudentEventProposals user={user} authorizedSocieties={authorizedSocieties} />
         )}

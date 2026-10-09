@@ -23,8 +23,8 @@ export const SECTION_MODULES: SectionModuleOption[] = [
   },
   {
     key: "BUDGET",
-    label: "Budget Breakdown Table",
-    description: "Itemized expenditure table with Quantity, Unit Price, Tentative Cost, and GST note",
+    label: "Budget Breakdown Table (Standalone Page)",
+    description: "Itemized expenditure table with Quantity, Unit Price, Tentative Cost, GST note, and Signatories",
     categoryKey: "FINANCE",
   },
   {
@@ -63,6 +63,52 @@ export const SECTION_MODULES: SectionModuleOption[] = [
     description: "Desk marketing tables/chairs, standees/banners, classroom promotion, Registrar mail, LED TVs, flash mob",
     categoryKey: "MARKETING",
   },
+  {
+    key: "SECURITY",
+    label: "E. Security & Crowd Management Requirements",
+    description: "Campus security guards, barricading, gate access control, night surveillance, and VIP escorts",
+    categoryKey: "SECURITY",
+  },
+  {
+    key: "FELICITATION",
+    label: "F. Dignitary Felicitation & Protocol Material",
+    description: "Sambalpuri shawls, brass diya lamp, fresh flower bouquets, VIP delegate kits, and mementos",
+    categoryKey: "FELICITATION",
+  },
+  {
+    key: "SPONSORS",
+    label: "G. Sponsors & Memorandum of Understanding (MoU)",
+    description: "Title/Associate sponsors, contribution amount, contact person, and signed MoU documents",
+    categoryKey: "SPONSORS",
+  },
+];
+
+export const BANNER_FORMAT_PRESETS = [
+  { label: "Stage Backdrop (12x8 ft)", dimensions: "12x8 ft", material: "Star Flex", description: "Main Auditorium Stage Backdrop flex (12ft width x 8ft height)" },
+  { label: "Entrance Gate Arch (8x4 ft)", dimensions: "8x4 ft", material: "Star Flex", description: "Campus Main Gate & Auditorium Foyer Arch flex (8ft width x 4ft height)" },
+  { label: "Indoor Roll-up Standee (6x3 ft)", dimensions: "6x3 ft", material: "Roll-up Standee", description: "Indoor Registration Desk, Lobby & Auditorium Foyer Standee" },
+  { label: "Promotional Standee (5x2 ft)", dimensions: "5x2 ft", material: "Flex Standee", description: "Campus Walkway & Academic Corridor Standee" },
+  { label: "Speaker Podium Wrap (4x2.5 ft)", dimensions: "4x2.5 ft", material: "Vinyl Wrap", description: "Speaker Podium Front Branding" },
+  { label: "Custom Banner Dimensions", dimensions: "Custom", material: "Star Flex", description: "Custom dimensions for specialized stage setups" },
+];
+
+export const POSTER_FORMAT_PRESETS = [
+  { label: "A3 Physical Print (Glossy 180 GSM)", dimensions: "297 x 420 mm", description: "Official notice boards, auditoriums & academic block display" },
+  { label: "A4 Notice Board Flyer", dimensions: "210 x 297 mm", description: "Hostel notice boards & departmental notice desks" },
+  { label: "Digital Square (1080 x 1080 px)", dimensions: "1080x1080 px", description: "Instagram Post feed & WhatsApp group promotion" },
+  { label: "Digital Portrait (1080 x 1350 px)", dimensions: "1080x1350 px", description: "Instagram Portrait Post (4:5 ratio)" },
+  { label: "Digital Fullscreen Story (1080 x 1920 px)", dimensions: "1080x1920 px", description: "Instagram & WhatsApp Full Screen Story (9:16)" },
+];
+
+export const SPONSOR_TIERS = [
+  "Title Sponsor",
+  "Co-Sponsor",
+  "Powered By Sponsor",
+  "Associate Sponsor",
+  "Beverage / Food Partner",
+  "Technical / Platform Partner",
+  "Merchandise Partner",
+  "Media & Outreach Partner",
 ];
 
 export const SMART_ITEM_PRESETS = {
@@ -119,24 +165,48 @@ export const SMART_ITEM_PRESETS = {
     "Speaker Reveal Banner (8ft x 20ft)",
     "Custom Marketing / Logistics Item...",
   ],
+  SECURITY: [
+    "Campus Security Guards (Male/Female)",
+    "Main Gate Entry Verification & ID Frisking",
+    "Crowd Control Barricading & Queue Managers",
+    "Night Security Surveillance (Post 9:00 PM)",
+    "Dignitary / VIP Escort Security Team",
+    "Parking & Campus Traffic Management Guards",
+    "Auditorium Entry/Exit Gate Marshals",
+    "Custom Security Requirement...",
+  ],
+  FELICITATION: [
+    "Traditional Sambalpuri Handloom Shawl / Angavastram",
+    "Fresh Floral Bouquet / Flower Basket",
+    "Custom Engraved Memento / Trophy with KSAC KIIT Branding",
+    "Traditional Brass Lamp (Diya) + Oil + Wicks + Camphor",
+    "VIP Delegate Welcome Kit (Executive Pen, Notebook, Folder)",
+    "Honorary Floral Garland for Dignitaries",
+    "Silver Filigree (Tarakasi) Souvenir",
+    "Custom Felicitation Item...",
+  ],
   BUDGET: [
     { label: "Standee (5ft x 2ft)", defaultPrice: "300" },
     { label: "Standee (6ft x 4ft)", defaultPrice: "288" },
     { label: "Standee (8ft x 10ft)", defaultPrice: "960" },
     { label: "Banner (8ft x 10ft)", defaultPrice: "700" },
     { label: "Banner (6ft x 3ft)", defaultPrice: "216" },
+    { label: "Stage Backdrop Banner (12ft x 8ft)", defaultPrice: "1440" },
+    { label: "Entrance Gate Banner (8ft x 4ft)", defaultPrice: "480" },
     { label: "Speaker Reveal Banner (8ft x 20ft)", defaultPrice: "2000" },
-    { label: "Posters (A3 size)", defaultPrice: "25" },
-    { label: "Posters (A4 size)", defaultPrice: "30" },
+    { label: "Posters (A3 size - Glossy)", defaultPrice: "25" },
+    { label: "Posters (A4 size)", defaultPrice: "15" },
     { label: "Winner Certificates", defaultPrice: "25" },
     { label: "Winner Mementos / Trophies", defaultPrice: "500" },
-    { label: "Medals", defaultPrice: "15" },
+    { label: "Medals", defaultPrice: "35" },
     { label: "OC ID Cards + Lanyards", defaultPrice: "60" },
     { label: "OC Food (Day 1)", defaultPrice: "120" },
     { label: "OC Food (Day 2)", defaultPrice: "120" },
     { label: "OC Snacks / Samosa & Juice", defaultPrice: "30" },
-    { label: "Water Bottles", defaultPrice: "8" },
-    { label: "Bouquet for Guest/Speaker", defaultPrice: "250" },
+    { label: "Water Bottles", defaultPrice: "10" },
+    { label: "Sambalpuri Shawl for Dignitaries", defaultPrice: "850" },
+    { label: "Bouquet for Guest/Speaker", defaultPrice: "350" },
+    { label: "Brass Lamp Inauguration Kit", defaultPrice: "500" },
     { label: "Transportation of Speaker", defaultPrice: "1000" },
     { label: "Speaker Fees", defaultPrice: "115000" },
     { label: "Speaker Fees GST (18%)", defaultPrice: "20700" },
@@ -203,7 +273,7 @@ export const DEFAULT_DEPARTMENT_DIRECTORY: DepartmentDirectoryConfig[] = [
     ccEmails: ["ksac.office@kiit.ac.in"],
     contactPerson: "Deputy Director (Estate & Infrastructure)",
     defaultSubjectTemplate:
-      "KSAC Venue Allotment Request â€” {eventName} ({society}) on {dateDisplay}",
+      "KSAC Venue Allotment Request - {eventName} ({society}) on {dateDisplay}",
     defaultHeaderNote:
       "Kindly arrange and allot the following campus venues (Lecture Halls / Classrooms / Auditoriums) for the approved KSAC society event:",
   },
@@ -214,7 +284,7 @@ export const DEFAULT_DEPARTMENT_DIRECTORY: DepartmentDirectoryConfig[] = [
     ccEmails: ["it.support@kiit.ac.in", "ksac.office@kiit.ac.in"],
     contactPerson: "In-Charge (Electrical & Central Sound/AV)",
     defaultSubjectTemplate:
-      "KSAC Technical & Sound/AV Requirement â€” {eventName} ({society}) on {dateDisplay}",
+      "KSAC Technical & Sound/AV Requirement - {eventName} ({society}) on {dateDisplay}",
     defaultHeaderNote:
       "Kindly arrange the following technical, sound, AV, and electrical power setups for the approved KSAC society event:",
   },
@@ -225,7 +295,7 @@ export const DEFAULT_DEPARTMENT_DIRECTORY: DepartmentDirectoryConfig[] = [
     ccEmails: ["guesthouse@kiit.ac.in", "ksac.office@kiit.ac.in"],
     contactPerson: "Manager (KIIT Hospitality & Catering)",
     defaultSubjectTemplate:
-      "KSAC Food, Refreshments & Hospitality Request â€” {eventName} ({society}) on {dateDisplay}",
+      "KSAC Food, Refreshments & Hospitality Request - {eventName} ({society}) on {dateDisplay}",
     defaultHeaderNote:
       "Kindly arrange the following refreshments, water bottles, OC food packets, and guest hospitality items for the approved KSAC event:",
   },
@@ -236,9 +306,31 @@ export const DEFAULT_DEPARTMENT_DIRECTORY: DepartmentDirectoryConfig[] = [
     ccEmails: ["campus.security@kiit.ac.in", "ksac.office@kiit.ac.in"],
     contactPerson: "Office of the Registrar & Campus Administration",
     defaultSubjectTemplate:
-      "KSAC Event Promotion & Logistics Intimation â€” {eventName} ({society})",
+      "KSAC Event Promotion & Logistics Intimation - {eventName} ({society})",
     defaultHeaderNote:
       "Kindly grant permission and arrange logistics for the following marketing, desk promotion, LED screen display, and promotional activities:",
+  },
+  {
+    name: "Campus Security & Discipline Department",
+    categoryKey: "SECURITY",
+    primaryEmail: "security.control@kiit.ac.in",
+    ccEmails: ["chief.security@kiit.ac.in", "ksac.office@kiit.ac.in"],
+    contactPerson: "Chief Security Officer (CSO)",
+    defaultSubjectTemplate:
+      "KSAC Campus Security & Crowd Management Requisition - {eventName} ({society}) on {dateDisplay}",
+    defaultHeaderNote:
+      "Kindly deploy the following campus security personnel, crowd control barriers, and gate access arrangements for the approved KSAC society event:",
+  },
+  {
+    name: "Dignitary Felicitation & Protocol Cell",
+    categoryKey: "FELICITATION",
+    primaryEmail: "protocol.felicitation@kiit.ac.in",
+    ccEmails: ["ksac.office@kiit.ac.in"],
+    contactPerson: "Protocol Officer (KSAC / Registrar Office)",
+    defaultSubjectTemplate:
+      "KSAC Dignitary Felicitation & Protocol Material Requisition - {eventName} ({society})",
+    defaultHeaderNote:
+      "Kindly arrange the following dignitary felicitation materials, shawls, brass lamp, and hospitality kits for the approved KSAC event:",
   },
   {
     name: "Finance, Accounts & Printing Procurement",
@@ -247,7 +339,7 @@ export const DEFAULT_DEPARTMENT_DIRECTORY: DepartmentDirectoryConfig[] = [
     ccEmails: ["ksac.finance@kiit.ac.in"],
     contactPerson: "Finance & Central Procurement Officer",
     defaultSubjectTemplate:
-      "KSAC Approved Event Budget & Procurement â€” {eventName} ({society}) [Rs. {budgetTotal}/-]",
+      "KSAC Approved Event Budget & Procurement - {eventName} ({society}) [Rs. {budgetTotal}/-]",
     defaultHeaderNote:
       "Please find below the approved budget breakdown, printing/flex specifications, and financial particulars for the KSAC society event:",
   },
@@ -340,18 +432,16 @@ export function numberToIndianRupeeWords(amount: number): string {
   return `Rupees ${parts.join(" ")} Only`;
 }
 
-/**
- * Formats a number in Indian numbering format (e.g. 232750 -> "2,32,750")
- */
 export function formatIndianCurrency(amount: number): string {
   const num = Math.round(Number(amount) || 0);
   return num.toLocaleString("en-IN");
 }
 
 /**
- * Strictly checks if a user is authorized to access the Event Proposal workflow.
+ * Checks if a user is authorized to access the Event Proposal workflow.
  * Allowed:
- * - Society Presidents & Vice-Presidents (`isSocietyLead === true` or `position` in ["President", "Vice-President"])
+ * - Society Presidents & Vice-Presidents
+ * - Faculty In-Charge (`role === "fic"`)
  * - Dean KSAC (`role === "dean"`) and Admin (`role === "admin"`)
  */
 export function isAuthorizedForEventProposal(user: {
@@ -363,10 +453,11 @@ export function isAuthorizedForEventProposal(user: {
 } | null | undefined): boolean {
   if (!user) return false;
   if (user.role === "dean" || user.role === "admin" || user.role === "ksac") return true;
+  if (user.role === "fic") return true;
   if (user.role === "president" || user.role === "vice_president") return true;
   if (user.role !== "student") return false;
 
-  const allowedPositions = ["president", "vice-president", "vice president"];
+  const allowedPositions = ["president", "vice-president", "vice president", "lead", "coordinator"];
   if (user.position && allowedPositions.includes(user.position.trim().toLowerCase())) {
     return true;
   }
@@ -408,7 +499,7 @@ const escapeHtml = (str: unknown): string => {
 
 /**
  * Extracts requirements department-wise from an EventProposal and synthesizes
- * ready-to-send email templates for Dean KSAC using the configured Department Directory.
+ * ready-to-send email templates for Dean KSAC.
  */
 export function extractDepartmentEmailsForProposal(
   proposal: any,
@@ -428,7 +519,7 @@ export function extractDepartmentEmailsForProposal(
         primaryEmail: `${key.toLowerCase()}@kiit.ac.in`,
         ccEmails: ["ksac.office@kiit.ac.in"],
         contactPerson: `${key} In-Charge`,
-        defaultSubjectTemplate: `KSAC Event Requirement [{category}] â€” {eventName} ({society})`,
+        defaultSubjectTemplate: `KSAC Event Requirement [{category}] - {eventName} ({society})`,
         defaultHeaderNote: `Kindly arrange the following approved requirements for ${proposal.eventName}:`,
       }
     );
@@ -517,7 +608,7 @@ KIIT Deemed to be University, Bhubaneswar`;
     <strong>Society:</strong> ${escapeHtml(proposal.society)} under KSAC<br/>
     <strong>Event Date(s):</strong> ${escapeHtml(proposal.dateDisplay || proposal.startDate)}<br/>
     <strong>Primary Campus:</strong> ${escapeHtml(proposal.venueCampus || "KIIT Campus")}<br/>
-    <strong>Student Lead:</strong> ${escapeHtml(proposal.studentName)} (${escapeHtml(proposal.position)})
+    <strong>Student Lead:</strong> ${escapeHtml(proposal.studentName || "")} (${escapeHtml(proposal.position || "Lead")})
   </div>
   <table style="border-collapse:collapse;width:100%;margin:16px 0;">
     <thead><tr>${thHtml}</tr></thead>
@@ -611,7 +702,42 @@ KIIT Deemed to be University, Bhubaneswar`;
     );
   }
 
-  // 5. FINANCE / BUDGET & SPEAKER FEES
+  // 5. SECURITY REQUIREMENTS
+  const securityReqs = Array.isArray(proposal.securityRequirements) ? proposal.securityRequirements : [];
+  if (enabled.includes("SECURITY") && securityReqs.length > 0) {
+    const dept = getDept("SECURITY");
+    const rows = securityReqs.map((s: any, idx: number) => [
+      String(idx + 1),
+      s.date || proposal.dateDisplay || "-",
+      s.timings || "-",
+      s.campus || proposal.venueCampus || "-",
+      s.securityType || s.item || "Security Guards",
+      String(s.quantity ?? "1"),
+      s.details || "-",
+    ]);
+    results.push(
+      buildEnvelope(dept, ["Sl. No.", "Date", "Timings", "Campus / Location", "Security Requisition", "Personnel / Qty", "Crowd & Access Details"], rows)
+    );
+  }
+
+  // 6. FELICITATION MATERIAL REQUIREMENTS
+  const felicitationReqs = Array.isArray(proposal.felicitationRequirements) ? proposal.felicitationRequirements : [];
+  if (enabled.includes("FELICITATION") && felicitationReqs.length > 0) {
+    const dept = getDept("FELICITATION");
+    const rows = felicitationReqs.map((f: any, idx: number) => [
+      String(idx + 1),
+      f.date || proposal.dateDisplay || "-",
+      f.item || "-",
+      String(f.quantity ?? "1"),
+      f.recipientDignitary || "Chief Guest / Dignitaries",
+      f.details || "-",
+    ]);
+    results.push(
+      buildEnvelope(dept, ["Sl. No.", "Date", "Material / Item", "Quantity", "Recipient Dignitary", "Specifications"], rows)
+    );
+  }
+
+  // 7. FINANCE / BUDGET & SPEAKER FEES
   const budgetItems = Array.isArray(proposal.budgetItems) ? proposal.budgetItems : [];
   if (enabled.includes("BUDGET") && budgetItems.length > 0) {
     const dept = getDept("FINANCE");
@@ -637,4 +763,3 @@ KIIT Deemed to be University, Bhubaneswar`;
 
   return results;
 }
-

@@ -7,6 +7,9 @@ import {
   SECTION_MODULES,
   SMART_ITEM_PRESETS,
   DEFAULT_SIGNATORY_PRESETS,
+  BANNER_FORMAT_PRESETS,
+  POSTER_FORMAT_PRESETS,
+  SPONSOR_TIERS,
   numberToIndianRupeeWords,
   formatIndianCurrency,
 } from "@/lib/eventProposalPresets";
@@ -29,7 +32,7 @@ export default function StudentEventProposals({ user, authorizedSocieties }: Pro
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   // View Mode: "list" | "builder" | "preview"
-  const [viewMode, setViewMode] = useState<"list" | "builder" | "preview">("list");
+  const [viewMode, setViewMode] = useState<"list" | "builder" | "preview" | "rough">("list");
   const [selectedProposal, setSelectedProposal] = useState<any | null>(null);
 
   // Form State
@@ -198,6 +201,73 @@ export default function StudentEventProposals({ user, authorizedSocieties }: Pro
     },
   ]);
 
+  // Security Requisition Requirements
+  const [securityRequirements, setSecurityRequirements] = useState<any[]>([
+    {
+      date: "",
+      timings: "09:00 AM - 09:00 PM",
+      campus: "Campus 25 Gate & Auditorium",
+      securityType: "Campus Security Guards",
+      quantity: 4,
+      details: "Main gate access verification and crowd control marshals",
+    },
+  ]);
+
+  // Felicitation Protocol Requirements
+  const [felicitationRequirements, setFelicitationRequirements] = useState<any[]>([
+    {
+      date: "",
+      item: "Traditional Sambalpuri Handloom Shawl / Angavastram",
+      quantity: 2,
+      recipientDignitary: "Chief Guest & Keynote Dignitary",
+      details: "Official university handloom felicitation drape",
+    },
+    {
+      date: "",
+      item: "Traditional Brass Lamp (Diya) + Oil + Wicks + Camphor",
+      quantity: 1,
+      recipientDignitary: "Inaugural Ceremony Stage",
+      details: "Inauguration lamp lighting setup with bronze stand",
+    },
+  ]);
+
+  // Sponsors & Memorandum of Understanding (MoU)
+  const [sponsors, setSponsors] = useState<any[]>([]);
+
+  // Promotional Uploads: Banner, Poster & Society Logo
+  const [bannerDetails, setBannerDetails] = useState({
+    format: "Stage Backdrop (12x8 ft)",
+    dimensions: "12x8 ft",
+    material: "Star Flex",
+    fileName: "",
+    dataUrl: "",
+    mimeType: "",
+  });
+
+  const [posterDetails, setPosterDetails] = useState({
+    format: "A3 Physical Print (Glossy 180 GSM)",
+    fileName: "",
+    dataUrl: "",
+    mimeType: "",
+  });
+
+  const [societyLogo, setSocietyLogo] = useState({
+    fileName: "",
+    dataUrl: "",
+    mimeType: "",
+  });
+
+  // Pre-Proposal Rough Requests State
+  const [roughRequests, setRoughRequests] = useState<any[]>([]);
+  const [roughRequestId, setRoughRequestId] = useState<string | null>(null);
+  const [roughForm, setRoughForm] = useState({
+    eventName: "",
+    eventDate: "",
+    estimatedBudget: "",
+    description: "",
+  });
+  const [submittingRough, setSubmittingRough] = useState(false);
+
   // Signatories State (President/VP or Dean can add/remove)
   const [signatories, setSignatories] = useState<any[]>(() =>
     DEFAULT_SIGNATORY_PRESETS.map((sp) =>
@@ -213,6 +283,10 @@ export default function StudentEventProposals({ user, authorizedSocieties }: Pro
       const res = await dispatchGateway(GATEWAY_OPCODES.FETCH_EVENT_PROPOSALS);
       if (res.ok && res.data && Array.isArray(res.data.proposals)) {
         setProposals(res.data.proposals);
+      }
+      const roughRes = await dispatchGateway<{ requests: any[] }>(GATEWAY_OPCODES.FETCH_ROUGH_REQUESTS);
+      if (roughRes.ok && roughRes.data?.requests) {
+        setRoughRequests(roughRes.data.requests);
       }
     } catch (err) {
       console.error("Failed to fetch event proposals:", err);
@@ -291,9 +365,73 @@ export default function StudentEventProposals({ user, authorizedSocieties }: Pro
       startDate: m.startDate || startDate,
       endDate: m.endDate || endDate,
     })),
+    securityRequirements: securityRequirements.map((s) => ({
+      ...s,
+      date: s.date || dateDisplay || startDate,
+    })),
+    felicitationRequirements: felicitationRequirements.map((f) => ({
+      ...f,
+      date: f.date || dateDisplay || startDate,
+    })),
+    sponsors,
+    bannerDetails,
+    posterDetails,
+    societyLogo,
+    roughRequestId,
     signatories,
     status: selectedProposal?.status || "DRAFT",
   });
+
+  const handleCreateFromRough = (r: any) => {
+    handleResetBuilder();
+    setEventName(r.eventName || "");
+    setDateDisplay(r.eventDate || "");
+    setRoughRequestId(r._id);
+    if (r.society) setSociety(r.society);
+    if (r.estimatedBudget) {
+      setBudgetItems([
+        {
+          slNo: 1,
+          particulars: "Estimated Event Expenses (from Pre-request)",
+          quantity: "1",
+          unitPrice: String(r.estimatedBudget),
+          totalCost: Number(r.estimatedBudget),
+          category: "FINANCE",
+        },
+      ]);
+    }
+    setViewMode("builder");
+  };
+
+  const handleSaveRoughRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!roughForm.eventName || !roughForm.eventDate) {
+      setToast({ type: "error", text: "Event Name and Date are required." });
+      return;
+    }
+    setSubmittingRough(true);
+    try {
+      const res = await dispatchGateway(GATEWAY_OPCODES.SAVE_ROUGH_REQUEST, {
+        eventName: roughForm.eventName,
+        eventDate: roughForm.eventDate,
+        estimatedBudget: parseFloat(roughForm.estimatedBudget.replace(/[^0-9.]/g, "")) || 0,
+        society,
+        description: roughForm.description,
+      });
+
+      if (res.ok) {
+        setToast({ type: "success", text: "Rough Event Request submitted! Awaiting Dean / FIC review." });
+        setRoughForm({ eventName: "", eventDate: "", estimatedBudget: "", description: "" });
+        fetchProposals();
+      } else {
+        setToast({ type: "error", text: res.message || "Failed to submit rough request." });
+      }
+    } catch (err: any) {
+      setToast({ type: "error", text: err.message || "Network error." });
+    } finally {
+      setSubmittingRough(false);
+    }
+  };
 
   const handleResetBuilder = () => {
     setEditingId(null);
@@ -338,6 +476,13 @@ export default function StudentEventProposals({ user, authorizedSocieties }: Pro
     setBackground(p.background || "");
     setObjectives(Array.isArray(p.objectives) ? p.objectives : []);
     setEventFormatSummary(p.eventFormatSummary || "");
+    setSecurityRequirements(Array.isArray(p.securityRequirements) ? p.securityRequirements : []);
+    setFelicitationRequirements(Array.isArray(p.felicitationRequirements) ? p.felicitationRequirements : []);
+    setSponsors(Array.isArray(p.sponsors) ? p.sponsors : []);
+    if (p.bannerDetails) setBannerDetails(p.bannerDetails);
+    if (p.posterDetails) setPosterDetails(p.posterDetails);
+    if (p.societyLogo) setSocietyLogo(p.societyLogo);
+    setRoughRequestId(p.roughRequestId || null);
     setSummary(p.summary || "");
     setEnabledSections(
       Array.isArray(p.enabledSections)
@@ -549,11 +694,22 @@ export default function StudentEventProposals({ user, authorizedSocieties }: Pro
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setViewMode("rough")}
+              className={`rounded-2xl border px-4 py-2.5 text-xs font-bold transition shadow-xs cursor-pointer ${
+                viewMode === "rough"
+                  ? "bg-amber-600 text-white border-amber-600 shadow-md shadow-amber-600/20"
+                  : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              ⚡ Pre-Proposal Rough Requests ({roughRequests.length})
+            </button>
             {viewMode !== "list" && (
               <button
                 type="button"
                 onClick={() => setViewMode("list")}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100 shadow-xs"
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100 shadow-xs cursor-pointer"
               >
                 &larr; All Proposals ({proposals.length})
               </button>
@@ -565,7 +721,7 @@ export default function StudentEventProposals({ user, authorizedSocieties }: Pro
                   setSelectedProposal(buildLiveProposalSnapshot());
                   setViewMode("preview");
                 }}
-                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 shadow-xs flex items-center gap-1.5"
+                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <span>📄</span> Live Document Preview
               </button>
@@ -577,7 +733,7 @@ export default function StudentEventProposals({ user, authorizedSocieties }: Pro
                   handleResetBuilder();
                   setViewMode("builder");
                 }}
-                className="rounded-2xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-700 active:scale-95 flex items-center gap-1.5"
+                className="rounded-2xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-700 active:scale-95 flex items-center gap-1.5 cursor-pointer"
               >
                 <span>+</span> Initiate New Event Proposal
               </button>
@@ -607,6 +763,203 @@ export default function StudentEventProposals({ user, authorizedSocieties }: Pro
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {/* ==================== VIEW: PRE-PROPOSAL ROUGH REQUESTS ==================== */}
+      {viewMode === "rough" && (
+        <div className="space-y-6">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+              <div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black uppercase">
+                  ⚡ Pre-Proposal Quick Intake
+                </span>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">
+                  Submit Rough Event Idea Before Formal Filing
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                  Before investing time in drafting a 5-page formal proposal and detailed line-item budget, submit your preliminary concept with rough dates and budget. The Faculty In-Charge (FIC) or Dean KSAC will review and mark it as <strong>Approved</strong>, <strong>Disapproved</strong>, or <strong>Waiting</strong>.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewMode("builder")}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition active:scale-95 cursor-pointer"
+              >
+                + Go Directly to Proposal Builder
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveRoughRequest} className="mt-6 space-y-4 max-w-3xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Event Title / Working Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. KRONOS 2026 - Hack & Build"
+                    value={roughForm.eventName}
+                    onChange={(e) => setRoughForm({ ...roughForm, eventName: e.target.value })}
+                    className="w-full text-xs p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Tentative Event Date(s) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 24th - 25th October 2026"
+                    value={roughForm.eventDate}
+                    onChange={(e) => setRoughForm({ ...roughForm, eventDate: e.target.value })}
+                    className="w-full text-xs p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Rough Estimated Budget (INR ₹) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 150000"
+                    value={roughForm.estimatedBudget}
+                    onChange={(e) => setRoughForm({ ...roughForm, estimatedBudget: e.target.value })}
+                    className="w-full text-xs p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-emerald-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Society under KSAC
+                  </label>
+                  <select
+                    value={society}
+                    onChange={(e) => setSociety(e.target.value)}
+                    className="w-full text-xs p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800"
+                  >
+                    {authorizedSocieties.map((s, idx) => (
+                      <option key={idx} value={s.society}>
+                        {s.society} ({s.position})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Brief Concept &amp; Target Participants
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Outline the core objective, expected footfall, and major speakers or sub-tracks..."
+                  value={roughForm.description}
+                  onChange={(e) => setRoughForm({ ...roughForm, description: e.target.value })}
+                  className="w-full text-xs p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-emerald-500"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={submittingRough}
+                  className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shadow-md transition disabled:opacity-50 cursor-pointer"
+                >
+                  {submittingRough ? "Submitting..." : "⚡ Submit Rough Request for FIC / Dean Review"}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Rough Requests List Table */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs space-y-4">
+            <h4 className="text-base font-black text-slate-900">
+              Submitted Rough Requests &amp; Review Status
+            </h4>
+
+            {roughRequests.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 font-bold text-xs">
+                No rough pre-requests submitted yet. Fill the quick form above to get preliminary clearance!
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-black">
+                      <th className="p-3">Event Working Title</th>
+                      <th className="p-3">Society</th>
+                      <th className="p-3">Tentative Dates</th>
+                      <th className="p-3">Rough Budget</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3">Review Remarks</th>
+                      <th className="p-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {roughRequests.map((r) => (
+                      <tr key={r._id} className="hover:bg-slate-50/60">
+                        <td className="p-3 font-bold text-slate-900">{r.eventName}</td>
+                        <td className="p-3">{r.society}</td>
+                        <td className="p-3">{r.eventDate}</td>
+                        <td className="p-3 font-mono font-bold text-emerald-700">
+                          Rs. {formatIndianCurrency(r.estimatedBudget || 0)}/-
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2.5 py-1 rounded-md font-bold text-[10px] ${
+                              r.status === "APPROVED"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                : r.status === "DISAPPROVED"
+                                ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                : "bg-amber-100 text-amber-800 border border-amber-200"
+                            }`}
+                          >
+                            {r.status === "APPROVED"
+                              ? "✓ Approved"
+                              : r.status === "DISAPPROVED"
+                              ? "✗ Disapproved"
+                              : "⏳ Waiting Review"}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-600 max-w-xs">
+                          {r.reviewRemarks || <span className="text-slate-400 italic">No notes yet</span>}
+                          {r.reviewerName && (
+                            <div className="text-[10px] text-slate-400 font-semibold">
+                              Reviewed by: {r.reviewerName} ({r.reviewerRole?.toUpperCase()})
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          {r.status === "APPROVED" ? (
+                            <button
+                              type="button"
+                              onClick={() => handleCreateFromRough(r)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] shadow-xs transition active:scale-95 cursor-pointer"
+                            >
+                              Create Full Proposal &rarr;
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 text-[11px] italic">Awaiting clearance</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -2293,6 +2646,622 @@ export default function StudentEventProposals({ user, authorizedSocieties }: Pro
               ))}
             </div>
           </div>
+
+          {/* ==================== MODULE: SECURITY & CROWD MANAGEMENT REQUIREMENTS ==================== */}
+          {enabledSections.includes("SECURITY") && (
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                    <span>🛡️</span> Module: Campus Security &amp; Crowd Control Requisitions
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Requisition security personnel, gate access checkpoints, barricading, and night surveillance directly with Campus Security.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSecurityRequirements([
+                      ...securityRequirements,
+                      {
+                        date: dateDisplay || startDate,
+                        timings: "09:00 AM - 09:00 PM",
+                        campus: venueCampus,
+                        securityType: "Campus Security Guards",
+                        quantity: 2,
+                        details: "Main gate access & crowd marshals",
+                      },
+                    ])
+                  }
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition cursor-pointer"
+                >
+                  + Add Security Row
+                </button>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-[11px] font-bold text-slate-400">Quick Presets:</span>
+                {SMART_ITEM_PRESETS.SECURITY.slice(0, 5).map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() =>
+                      setSecurityRequirements([
+                        ...securityRequirements,
+                        {
+                          date: dateDisplay || startDate,
+                          timings: "09:00 AM - 09:00 PM",
+                          campus: venueCampus,
+                          securityType: preset,
+                          quantity: 2,
+                          details: `Arrangement for ${eventName || "KSAC event"}`,
+                        },
+                      ])
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition cursor-pointer"
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
+
+              {securityRequirements.map((sec, idx) => (
+                <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center p-3 rounded-2xl bg-slate-50/70 border border-slate-200">
+                  <div className="sm:col-span-3">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Requisition Type</label>
+                    <input
+                      type="text"
+                      value={sec.securityType}
+                      onChange={(e) => {
+                        const copy = [...securityRequirements];
+                        copy[idx].securityType = e.target.value;
+                        setSecurityRequirements(copy);
+                      }}
+                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Campus / Gate</label>
+                    <input
+                      type="text"
+                      value={sec.campus}
+                      onChange={(e) => {
+                        const copy = [...securityRequirements];
+                        copy[idx].campus = e.target.value;
+                        setSecurityRequirements(copy);
+                      }}
+                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Timings</label>
+                    <input
+                      type="text"
+                      value={sec.timings}
+                      onChange={(e) => {
+                        const copy = [...securityRequirements];
+                        copy[idx].timings = e.target.value;
+                        setSecurityRequirements(copy);
+                      }}
+                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Qty</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={sec.quantity}
+                      onChange={(e) => {
+                        const copy = [...securityRequirements];
+                        copy[idx].quantity = Number(e.target.value) || 1;
+                        setSecurityRequirements(copy);
+                      }}
+                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white text-center"
+                    />
+                  </div>
+                  <div className="sm:col-span-3">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Details / Gate Protocol</label>
+                    <input
+                      type="text"
+                      value={sec.details}
+                      onChange={(e) => {
+                        const copy = [...securityRequirements];
+                        copy[idx].details = e.target.value;
+                        setSecurityRequirements(copy);
+                      }}
+                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-1 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setSecurityRequirements(securityRequirements.filter((_, i) => i !== idx))}
+                      className="text-rose-600 hover:text-rose-800 font-black text-sm"
+                      title="Remove row"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ==================== MODULE: DIGNITARY FELICITATION & PROTOCOL MATERIAL ==================== */}
+          {enabledSections.includes("FELICITATION") && (
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                    <span>💐</span> Module: Dignitary Felicitation &amp; Hospitality Protocol Material
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Sambalpuri handloom shawls, brass diya lamps, floral bouquets, and official mementos for guests.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFelicitationRequirements([
+                      ...felicitationRequirements,
+                      {
+                        date: dateDisplay || startDate,
+                        item: "Fresh Floral Bouquet / Flower Basket",
+                        quantity: 2,
+                        recipientDignitary: "Hon'ble Chief Guest",
+                        details: "Fresh flower floral arrangement",
+                      },
+                    ])
+                  }
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition cursor-pointer"
+                >
+                  + Add Material Row
+                </button>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-[11px] font-bold text-slate-400">Quick Presets:</span>
+                {SMART_ITEM_PRESETS.FELICITATION.slice(0, 5).map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() =>
+                      setFelicitationRequirements([
+                        ...felicitationRequirements,
+                        {
+                          date: dateDisplay || startDate,
+                          item: preset,
+                          quantity: 1,
+                          recipientDignitary: "Chief Guest / Keynote Speaker",
+                          details: "Arranged through KSAC protocol cell",
+                        },
+                      ])
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-[11px] font-bold text-purple-700 hover:bg-purple-100 transition cursor-pointer"
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
+
+              {felicitationRequirements.map((fel, idx) => (
+                <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center p-3 rounded-2xl bg-slate-50/70 border border-slate-200">
+                  <div className="sm:col-span-4">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Felicitation Item</label>
+                    <input
+                      type="text"
+                      value={fel.item}
+                      onChange={(e) => {
+                        const copy = [...felicitationRequirements];
+                        copy[idx].item = e.target.value;
+                        setFelicitationRequirements(copy);
+                      }}
+                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Qty</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={fel.quantity}
+                      onChange={(e) => {
+                        const copy = [...felicitationRequirements];
+                        copy[idx].quantity = Number(e.target.value) || 1;
+                        setFelicitationRequirements(copy);
+                      }}
+                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white text-center"
+                    />
+                  </div>
+                  <div className="sm:col-span-3">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Recipient Dignitary</label>
+                    <input
+                      type="text"
+                      value={fel.recipientDignitary}
+                      onChange={(e) => {
+                        const copy = [...felicitationRequirements];
+                        copy[idx].recipientDignitary = e.target.value;
+                        setFelicitationRequirements(copy);
+                      }}
+                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-3">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Specifications / Notes</label>
+                    <input
+                      type="text"
+                      value={fel.details}
+                      onChange={(e) => {
+                        const copy = [...felicitationRequirements];
+                        copy[idx].details = e.target.value;
+                        setFelicitationRequirements(copy);
+                      }}
+                      className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-1 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setFelicitationRequirements(felicitationRequirements.filter((_, i) => i !== idx))}
+                      className="text-rose-600 hover:text-rose-800 font-black text-sm"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ==================== MODULE: SPONSORS & MEMORANDUM OF UNDERSTANDING (MoU) ==================== */}
+          {enabledSections.includes("SPONSORS") && (
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                    <span>🤝</span> Module: Event Sponsors &amp; Memorandum of Understanding (MoU)
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Track corporate partners, title sponsors, cash/kind contributions, and attach signed MoU copies.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSponsors([
+                      ...sponsors,
+                      {
+                        name: "",
+                        tier: "Associate Sponsor",
+                        contributionAmount: 25000,
+                        mouFileName: "",
+                        mouDataUrl: "",
+                        mouMimeType: "application/pdf",
+                        contactPerson: "",
+                        contactEmail: "",
+                      },
+                    ])
+                  }
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition cursor-pointer"
+                >
+                  + Add Sponsor Partner
+                </button>
+              </div>
+
+              {sponsors.map((sp, idx) => (
+                <div key={idx} className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-700 uppercase">Sponsor #{idx + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSponsors(sponsors.filter((_, i) => i !== idx))}
+                      className="text-rose-600 hover:text-rose-800 font-bold text-xs"
+                    >
+                      Remove Sponsor
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase">Sponsor Company Name *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Red Bull / GitHub"
+                        value={sp.name}
+                        onChange={(e) => {
+                          const copy = [...sponsors];
+                          copy[idx].name = e.target.value;
+                          setSponsors(copy);
+                        }}
+                        className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase">Partnership Tier</label>
+                      <select
+                        value={sp.tier}
+                        onChange={(e) => {
+                          const copy = [...sponsors];
+                          copy[idx].tier = e.target.value;
+                          setSponsors(copy);
+                        }}
+                        className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                      >
+                        {SPONSOR_TIERS.map((tier, tIdx) => (
+                          <option key={tIdx} value={tier}>
+                            {tier}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase">Contribution Amount (₹)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={sp.contributionAmount}
+                        onChange={(e) => {
+                          const copy = [...sponsors];
+                          copy[idx].contributionAmount = Number(e.target.value) || 0;
+                          setSponsors(copy);
+                        }}
+                        className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase">Contact Person &amp; Email</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. John Doe (partner@company.com)"
+                        value={sp.contactPerson}
+                        onChange={(e) => {
+                          const copy = [...sponsors];
+                          copy[idx].contactPerson = e.target.value;
+                          setSponsors(copy);
+                        }}
+                        className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase">Upload Signed MoU (PDF / Scan)</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              const copy = [...sponsors];
+                              copy[idx].mouFileName = file.name;
+                              copy[idx].mouDataUrl = reader.result as string;
+                              copy[idx].mouMimeType = file.type || "application/pdf";
+                              setSponsors(copy);
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                          className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 cursor-pointer"
+                        />
+                        {sp.mouFileName && (
+                          <span className="text-[11px] font-bold text-emerald-700 truncate max-w-[140px]">
+                            ✓ {sp.mouFileName}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ==================== MODULE: PROMOTIONAL BANNERS, POSTERS & SOCIETY LOGO ARTWORK ==================== */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-6">
+            <div className="pb-3 border-b border-slate-100">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <span>🎨</span> Module: Promotional Banners, Posters &amp; Society Letterhead Branding
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Upload production-ready flex banners (with standard dimensions), official posters, and society emblems for printable letterheads.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* 1. Event Banner Flex */}
+              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/60 space-y-3">
+                <span className="text-xs font-black uppercase text-emerald-800 block">
+                  1. Stage &amp; Entrance Banner Flex
+                </span>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Standard Format &amp; Sizing</label>
+                  <select
+                    value={bannerDetails.format}
+                    onChange={(e) => {
+                      const selected = BANNER_FORMAT_PRESETS.find((b) => b.label === e.target.value);
+                      setBannerDetails({
+                        ...bannerDetails,
+                        format: e.target.value,
+                        dimensions: selected?.dimensions || "12x8 ft",
+                        material: selected?.material || "Star Flex",
+                      });
+                    }}
+                    className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-white font-bold"
+                  >
+                    {BANNER_FORMAT_PRESETS.map((bp, bIdx) => (
+                      <option key={bIdx} value={bp.label}>
+                        {bp.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Dimensions</label>
+                    <input
+                      type="text"
+                      value={bannerDetails.dimensions}
+                      onChange={(e) => setBannerDetails({ ...bannerDetails, dimensions: e.target.value })}
+                      className="w-full text-xs p-1.5 rounded-lg border border-slate-200 bg-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Flex Material</label>
+                    <input
+                      type="text"
+                      value={bannerDetails.material}
+                      onChange={(e) => setBannerDetails({ ...bannerDetails, material: e.target.value })}
+                      className="w-full text-xs p-1.5 rounded-lg border border-slate-200 bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Upload Banner Artwork</label>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        setBannerDetails({
+                          ...bannerDetails,
+                          fileName: file.name,
+                          dataUrl: reader.result as string,
+                          mimeType: file.type || "image/png",
+                        });
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-100 file:text-emerald-800 hover:file:bg-emerald-200 cursor-pointer"
+                  />
+                </div>
+
+                {bannerDetails.dataUrl && bannerDetails.dataUrl.startsWith("data:image") && (
+                  <img
+                    src={bannerDetails.dataUrl}
+                    alt="Banner preview"
+                    className="w-full h-24 object-contain rounded-xl bg-white border border-slate-200"
+                  />
+                )}
+              </div>
+
+              {/* 2. Official Poster */}
+              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/60 space-y-3">
+                <span className="text-xs font-black uppercase text-indigo-800 block">
+                  2. Official Event Poster
+                </span>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Print / Digital Format</label>
+                  <select
+                    value={posterDetails.format}
+                    onChange={(e) => setPosterDetails({ ...posterDetails, format: e.target.value })}
+                    className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-white font-bold"
+                  >
+                    {POSTER_FORMAT_PRESETS.map((pp, pIdx) => (
+                      <option key={pIdx} value={pp.label}>
+                        {pp.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Upload Poster Artwork</label>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        setPosterDetails({
+                          ...posterDetails,
+                          fileName: file.name,
+                          dataUrl: reader.result as string,
+                          mimeType: file.type || "image/png",
+                        });
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-100 file:text-indigo-800 hover:file:bg-indigo-200 cursor-pointer"
+                  />
+                </div>
+
+                {posterDetails.dataUrl && posterDetails.dataUrl.startsWith("data:image") && (
+                  <img
+                    src={posterDetails.dataUrl}
+                    alt="Poster preview"
+                    className="w-full h-24 object-contain rounded-xl bg-white border border-slate-200"
+                  />
+                )}
+              </div>
+
+              {/* 3. Society Emblem (For Printable Header) */}
+              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/60 space-y-3">
+                <span className="text-xs font-black uppercase text-purple-800 block">
+                  3. Society Logo (Document Header)
+                </span>
+                <p className="text-[11px] text-slate-500">
+                  Embeds your society crest right into the printable A4 letterhead alongside the KIIT &amp; KSAC logos.
+                </p>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Upload Transparent Logo (PNG)</label>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        setSocietyLogo({
+                          fileName: file.name,
+                          dataUrl: reader.result as string,
+                          mimeType: file.type || "image/png",
+                        });
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-100 file:text-purple-800 hover:file:bg-purple-200 cursor-pointer"
+                  />
+                </div>
+
+                {societyLogo.dataUrl && (
+                  <div className="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-200">
+                    <img
+                      src={societyLogo.dataUrl}
+                      alt="Society Logo preview"
+                      className="w-12 h-12 object-contain rounded"
+                    />
+                    <div className="text-xs">
+                      <strong className="block text-slate-800 truncate">{societyLogo.fileName}</strong>
+                      <span className="text-[10px] text-emerald-700 font-bold">✓ Ready for Letterhead Print</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
 
           {/* SUBMIT / SAVE ACTIONS */}
           <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-lg backdrop-blur-md">

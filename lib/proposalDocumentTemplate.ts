@@ -15,15 +15,14 @@ export interface ProposalDocumentOptions {
 
 /**
  * Generates an official, publication-quality A4 HTML document string matching
- * the official KIIT DU and KSAC reference documents (OMEGA 6.0, Codex 2.0, KATADIGM 1.0).
+ * the official KIIT DU and KSAC reference documents.
  *
  * Designed for 100% Vercel serverless and client-side compatibility:
  * - Uses inline base64 logos (zero network dependency, zero broken images).
+ * - Supports custom Society Logo embedded directly in letterhead headers.
  * - Exact formal typography: Arial uppercase letterhead headers, Times New Roman body.
  * - Clean 1px solid black bordered tables with proper column widths.
- * - Strict orphan prevention (`break-after: avoid`, `break-inside: avoid`).
- * - Self-contained Notesheet on Page 1 with dual signatories.
- * - Multi-signatory grid safely bounded with proposal summary.
+ * - Dedicated Independent Budget Page with Signatories strictly on the same page.
  */
 export function generateProposalDocumentHtml(
   proposal: any,
@@ -36,7 +35,7 @@ export function generateProposalDocumentHtml(
 
   const enabled: string[] = Array.isArray(proposal.enabledSections)
     ? proposal.enabledSections
-    : ["SUB_EVENTS", "GUIDELINES", "BUDGET", "VENUE", "TECHNICAL", "MARKETING"];
+    : ["SUB_EVENTS", "GUIDELINES", "BUDGET", "VENUE", "TECHNICAL", "MARKETING", "SECURITY", "FELICITATION", "SPONSORS"];
 
   const signatories: any[] = Array.isArray(proposal.signatories) ? proposal.signatories : [];
   const notesheetSignatories = signatories.filter(
@@ -59,7 +58,9 @@ export function generateProposalDocumentHtml(
 
   let sectionCounter = 1;
 
-  // Header HTML generator
+  const societyLogoUrl = proposal.societyLogo?.dataUrl || "";
+
+  // Header HTML generator supporting Society Logo
   const renderHeader = () => {
     if (useWideBannerHeader) {
       return `
@@ -81,6 +82,11 @@ export function generateProposalDocumentHtml(
       </div>
       <div class="ksac-emblem-box right">
         <img src="${KSAC_LOGO_BASE64}" alt="KSAC" class="ksac-emblem ksac" />
+        ${
+          societyLogoUrl
+            ? `<img src="${societyLogoUrl}" alt="${proposal.society || 'Society'} Logo" class="ksac-emblem society" />`
+            : ""
+        }
       </div>
     </div>
     <div class="ksac-header-rule"></div>`;
@@ -183,10 +189,11 @@ export function generateProposalDocumentHtml(
       display: block;
     }
     .ksac-emblem-box {
-      width: 65px;
+      min-width: 65px;
       flex-shrink: 0;
       display: flex;
       align-items: center;
+      gap: 6px;
     }
     .ksac-emblem-box.left {
       justify-content: flex-start;
@@ -201,10 +208,17 @@ export function generateProposalDocumentHtml(
       display: block;
     }
     .ksac-emblem.ksac {
-      width: 56px;
+      width: 52px;
       height: 46px;
       object-fit: contain;
       display: block;
+    }
+    .ksac-emblem.society {
+      width: 48px;
+      height: 46px;
+      object-fit: contain;
+      display: block;
+      border-radius: 4px;
     }
     .ksac-title-box {
       flex: 1;
@@ -416,30 +430,57 @@ export function generateProposalDocumentHtml(
 
     /* Budget highlight */
     .ksac-budget-highlight {
-      margin-top: 4px;
+      margin-top: 6px;
       margin-bottom: 12px;
       font-size: 10.5pt;
       line-height: 1.35;
       page-break-inside: avoid;
       break-inside: avoid;
+      border: 1px solid #000000;
+      padding: 8px 12px;
+      background-color: #fafafa;
+    }
+
+    /* Standalone Budget Page */
+    .ksac-budget-standalone-page {
+      page-break-before: always;
+      break-before: page;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .ksac-budget-title-block {
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .ksac-budget-title {
+      font-size: 13pt;
+      font-weight: bold;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .ksac-budget-subtitle {
+      font-size: 10pt;
+      font-weight: 600;
+      color: #334155;
+      margin-top: 2px;
     }
 
     /* Summary & Multi-Signatory Footer */
     .ksac-summary-and-signatures {
       page-break-inside: avoid;
       break-inside: avoid;
-      margin-top: 10px;
+      margin-top: 14px;
     }
     .ksac-footer-sig-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 24px 28px;
-      margin-top: 24px;
+      gap: 20px 24px;
+      margin-top: 20px;
       page-break-inside: avoid;
       break-inside: avoid;
     }
     .ksac-footer-sig-cell {
-      min-width: 210px;
+      min-width: 190px;
     }
     .ksac-footer-sig-cell.center {
       grid-column: span 2;
@@ -490,7 +531,7 @@ export function generateProposalDocumentHtml(
             proposal.dateDisplay || proposal.startDate || "Upcoming"
           }</strong> at <strong>${
             proposal.venueCampus || "KIIT Deemed to be University Campus"
-          }</strong>. The detailed event proposal and budget split are attached in the following annexures for kind perusal.`
+          }</strong>. The detailed event proposal, security requisitions, promotional flex specs, and itemized budget split are attached in the following annexures for kind perusal.`
         }
       </p>
 
@@ -562,14 +603,14 @@ export function generateProposalDocumentHtml(
     <!-- Screen-only divider (hidden during print) -->
     <hr class="ksac-screen-page-divider" />
 
-    <!-- ==================== PAGE 2+: DETAILED PROPOSAL & ANNEXURES ==================== -->
+    <!-- ==================== PAGE 2: DETAILED PROPOSAL & REQUIREMENTS ==================== -->
     <div class="ksac-doc-page ksac-page-break">
       ${renderHeader()}
 
       <div class="ksac-proposal-header-block">
         <div class="ksac-proposal-title">
           Proposal for ${proposal.eventName || "Event"}
-          ${proposal.tagline ? ` — ${proposal.tagline}` : ""}
+          ${proposal.tagline ? ` - ${proposal.tagline}` : ""}
         </div>
         <div class="ksac-proposal-society">
           Society Name : ${proposal.societyFullName || proposal.society || "KSAC"} under KSAC
@@ -662,7 +703,7 @@ export function generateProposalDocumentHtml(
                   (se: any, idx: number) => `
           <div style="margin-bottom: 8px;">
             <div style="font-weight: bold;">
-              Event ${idx + 1} — ${se.name || "Session"}
+              Event ${idx + 1} - ${se.name || "Session"}
               ${se.dayLabel ? ` - ${se.dayLabel}` : ""}
               ${se.date ? ` - ${se.date}` : ""}
               ${se.timings ? ` [${se.timings}]` : ""}
@@ -677,29 +718,21 @@ export function generateProposalDocumentHtml(
           : ""
       }
 
-      <!-- 4. Departmental Requirements -->
+      <!-- 4. Departmental & Venue Requirements -->
       ${
-        (enabled.includes("VENUE") &&
-          Array.isArray(proposal.venueRequirements) &&
-          proposal.venueRequirements.length > 0) ||
-        (enabled.includes("TECHNICAL") &&
-          Array.isArray(proposal.technicalRequirements) &&
-          proposal.technicalRequirements.length > 0) ||
-        (enabled.includes("FOOD") &&
-          Array.isArray(proposal.foodRequirements) &&
-          proposal.foodRequirements.length > 0) ||
-        (enabled.includes("MARKETING") &&
-          Array.isArray(proposal.marketingRequirements) &&
-          proposal.marketingRequirements.length > 0)
+        (enabled.includes("VENUE") && Array.isArray(proposal.venueRequirements) && proposal.venueRequirements.length > 0) ||
+        (enabled.includes("TECHNICAL") && Array.isArray(proposal.technicalRequirements) && proposal.technicalRequirements.length > 0) ||
+        (enabled.includes("FOOD") && Array.isArray(proposal.foodRequirements) && proposal.foodRequirements.length > 0) ||
+        (enabled.includes("MARKETING") && Array.isArray(proposal.marketingRequirements) && proposal.marketingRequirements.length > 0) ||
+        (enabled.includes("SECURITY") && Array.isArray(proposal.securityRequirements) && proposal.securityRequirements.length > 0) ||
+        (enabled.includes("FELICITATION") && Array.isArray(proposal.felicitationRequirements) && proposal.felicitationRequirements.length > 0)
           ? `
       <div style="margin-bottom: 14px;">
-        <h3 class="ksac-sec-title">${sectionCounter++}. Requirements</h3>
+        <h3 class="ksac-sec-title">${sectionCounter++}. Operational &amp; Campus Requirements</h3>
 
-        <!-- Venue -->
+        <!-- A. Venue Requirements -->
         ${
-          enabled.includes("VENUE") &&
-          Array.isArray(proposal.venueRequirements) &&
-          proposal.venueRequirements.length > 0
+          enabled.includes("VENUE") && Array.isArray(proposal.venueRequirements) && proposal.venueRequirements.length > 0
             ? `
         <div style="margin-bottom: 10px;">
           <h4 class="ksac-subsec-title">A. Venue Requirements</h4>
@@ -736,11 +769,9 @@ export function generateProposalDocumentHtml(
             : ""
         }
 
-        <!-- Technical -->
+        <!-- B. Technical Requirements -->
         ${
-          enabled.includes("TECHNICAL") &&
-          Array.isArray(proposal.technicalRequirements) &&
-          proposal.technicalRequirements.length > 0
+          enabled.includes("TECHNICAL") && Array.isArray(proposal.technicalRequirements) && proposal.technicalRequirements.length > 0
             ? `
         <div style="margin-bottom: 10px;">
           <h4 class="ksac-subsec-title">B. Technical &amp; Electrical Requirements</h4>
@@ -777,11 +808,9 @@ export function generateProposalDocumentHtml(
             : ""
         }
 
-        <!-- Food -->
+        <!-- C. Food Requirements -->
         ${
-          enabled.includes("FOOD") &&
-          Array.isArray(proposal.foodRequirements) &&
-          proposal.foodRequirements.length > 0
+          enabled.includes("FOOD") && Array.isArray(proposal.foodRequirements) && proposal.foodRequirements.length > 0
             ? `
         <div style="margin-bottom: 10px;">
           <h4 class="ksac-subsec-title">C. Accommodation &amp; Food Requirements</h4>
@@ -814,14 +843,12 @@ export function generateProposalDocumentHtml(
             : ""
         }
 
-        <!-- Marketing -->
+        <!-- D. Marketing Requirements -->
         ${
-          enabled.includes("MARKETING") &&
-          Array.isArray(proposal.marketingRequirements) &&
-          proposal.marketingRequirements.length > 0
+          enabled.includes("MARKETING") && Array.isArray(proposal.marketingRequirements) && proposal.marketingRequirements.length > 0
             ? `
         <div style="margin-bottom: 10px;">
-          <h4 class="ksac-subsec-title">D. Marketing &amp; Other Logistics Requirements</h4>
+          <h4 class="ksac-subsec-title">D. Marketing &amp; Logistics Requirements</h4>
           <table class="ksac-table">
             <thead>
               <tr>
@@ -854,72 +881,219 @@ export function generateProposalDocumentHtml(
         </div>`
             : ""
         }
+
+        <!-- E. Security & Crowd Management Requirements -->
+        ${
+          enabled.includes("SECURITY") && Array.isArray(proposal.securityRequirements) && proposal.securityRequirements.length > 0
+            ? `
+        <div style="margin-bottom: 10px;">
+          <h4 class="ksac-subsec-title">E. Security &amp; Crowd Management Requirements</h4>
+          <table class="ksac-table">
+            <thead>
+              <tr>
+                <th style="width: 45px;">Sl. No.</th>
+                <th style="width: 110px;">Date</th>
+                <th style="width: 100px;">Timings</th>
+                <th style="width: 100px;">Campus / Gate</th>
+                <th style="width: 180px;">Security Requisition</th>
+                <th style="width: 65px;">Guards</th>
+                <th>Access &amp; Crowd Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${proposal.securityRequirements
+                .map(
+                  (s: any, idx: number) => `
+              <tr>
+                <td style="text-align: center;">${idx + 1}</td>
+                <td>${s.date || "-"}</td>
+                <td>${s.timings || "-"}</td>
+                <td>${s.campus || proposal.venueCampus || "-"}</td>
+                <td>${s.securityType || s.item || "Security Guards"}</td>
+                <td style="text-align: center;">${s.quantity || "1"}</td>
+                <td>${s.details || "-"}</td>
+              </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>`
+            : ""
+        }
+
+        <!-- F. Felicitation Material Requirements -->
+        ${
+          enabled.includes("FELICITATION") && Array.isArray(proposal.felicitationRequirements) && proposal.felicitationRequirements.length > 0
+            ? `
+        <div style="margin-bottom: 10px;">
+          <h4 class="ksac-subsec-title">F. Dignitary Felicitation &amp; Hospitality Protocol Material</h4>
+          <table class="ksac-table">
+            <thead>
+              <tr>
+                <th style="width: 45px;">Sl. No.</th>
+                <th style="width: 110px;">Date</th>
+                <th style="width: 200px;">Felicitation Item / Material</th>
+                <th style="width: 65px;">Quantity</th>
+                <th style="width: 180px;">Recipient Dignitary</th>
+                <th>Specifications / Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${proposal.felicitationRequirements
+                .map(
+                  (f: any, idx: number) => `
+              <tr>
+                <td style="text-align: center;">${idx + 1}</td>
+                <td>${f.date || "-"}</td>
+                <td>${f.item || "-"}</td>
+                <td style="text-align: center;">${f.quantity || "1"}</td>
+                <td>${f.recipientDignitary || "Dignitary / Guest"}</td>
+                <td>${f.details || "-"}</td>
+              </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>`
+            : ""
+        }
       </div>`
           : ""
       }
 
-      <!-- 5. Revenue Model -->
+      <!-- 5. Sponsors & Memorandum of Understanding (MoU) -->
       ${
-        enabled.includes("REVENUE") &&
-        Array.isArray(proposal.revenueItems) &&
-        proposal.revenueItems.length > 0
+        enabled.includes("SPONSORS") && Array.isArray(proposal.sponsors) && proposal.sponsors.length > 0
           ? `
       <div style="margin-bottom: 14px;">
-        <h3 class="ksac-sec-title">${sectionCounter++}. Revenue Model</h3>
+        <h3 class="ksac-sec-title">${sectionCounter++}. Event Sponsors &amp; Memorandum of Understanding (MoU) :-</h3>
         <table class="ksac-table">
           <thead>
             <tr>
-              <th style="width: 55px;">Sl No.</th>
-              <th>Source</th>
-              <th style="width: 140px;">Amount</th>
-              <th style="width: 140px;">Total (in Rs.)</th>
+              <th style="width: 45px;">Sl. No.</th>
+              <th>Sponsor / Partner Name</th>
+              <th style="width: 140px;">Partnership Tier</th>
+              <th style="width: 130px;">Contribution (Rs.)</th>
+              <th style="width: 140px;">MoU Document Status</th>
             </tr>
           </thead>
           <tbody>
-            ${proposal.revenueItems
+            ${proposal.sponsors
               .map(
-                (r: any, idx: number) => `
+                (sp: any, idx: number) => `
             <tr>
               <td style="text-align: center;">${idx + 1}</td>
-              <td>${r.source || "-"}</td>
-              <td style="text-align: right;">${r.amountFormula || "-"}</td>
-              <td style="text-align: right;">${formatIndianCurrency(r.total || 0)}</td>
+              <td><strong>${sp.name || "-"}</strong>${sp.contactPerson ? `<br/><span style="font-size: 8.5pt; color: #475569;">Contact: ${sp.contactPerson}</span>` : ""}</td>
+              <td>${sp.tier || "Associate Partner"}</td>
+              <td style="text-align: right;">Rs. ${formatIndianCurrency(sp.contributionAmount || 0)}/-</td>
+              <td style="text-align: center;">${sp.mouFileName ? `<span style="color: #047857; font-weight: bold;">MoU Attached (${sp.mouFileName})</span>` : "<span style=\"color: #64748b;\">Under Process</span>"}</td>
             </tr>`
               )
               .join("")}
-            <tr>
-              <td colspan="3" style="text-align: right; font-weight: bold;">Total</td>
-              <td style="text-align: right; font-weight: bold;">${formatIndianCurrency(
-                revenueTotal
-              )}</td>
-            </tr>
           </tbody>
         </table>
       </div>`
           : ""
       }
 
-      <!-- 6. Budget Breakdown -->
+      <!-- 6. Promotional Banners & Posters Specifications -->
       ${
-        enabled.includes("BUDGET") &&
-        Array.isArray(proposal.budgetItems) &&
-        proposal.budgetItems.length > 0
+        proposal.bannerDetails?.fileName || proposal.posterDetails?.fileName
           ? `
       <div style="margin-bottom: 14px;">
-        <h3 class="ksac-sec-title">${sectionCounter++}. Budget :-</h3>
+        <h3 class="ksac-sec-title">${sectionCounter++}. Promotional Branding &amp; Printing Specifications :-</h3>
+        <table class="ksac-table">
+          <thead>
+            <tr>
+              <th style="width: 130px;">Asset Type</th>
+              <th style="width: 180px;">Format &amp; Sizing</th>
+              <th style="width: 120px;">Material / Media</th>
+              <th>Uploaded Artwork File</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              proposal.bannerDetails?.fileName
+                ? `
+            <tr>
+              <td><strong>Event Flex Banner</strong></td>
+              <td>${proposal.bannerDetails.dimensions || proposal.bannerDetails.format || "12x8 ft"}</td>
+              <td>${proposal.bannerDetails.material || "Star Flex"}</td>
+              <td>${proposal.bannerDetails.fileName}</td>
+            </tr>`
+                : ""
+            }
+            ${
+              proposal.posterDetails?.fileName
+                ? `
+            <tr>
+              <td><strong>Official Poster</strong></td>
+              <td>${proposal.posterDetails.format || "A3 Physical Print"}</td>
+              <td>Glossy Paper / Digital</td>
+              <td>${proposal.posterDetails.fileName}</td>
+            </tr>`
+                : ""
+            }
+          </tbody>
+        </table>
+      </div>`
+          : ""
+      }
+
+      <!-- 7. Proposal Operational Summary -->
+      <div style="margin-top: 14px;">
+        <h3 class="ksac-sec-title">${sectionCounter++}. Operational Summary</h3>
+        <p class="ksac-body-p">
+          ${
+            proposal.summary ||
+            `These arrangements are essential to ensure <strong>${
+              proposal.eventName || "the event"
+            }</strong> runs smoothly and reflects well on <strong>${
+              proposal.society || "KSAC"
+            }</strong>, <strong>KSAC</strong>, and <strong>KIIT Deemed to be University</strong>. The complete financial breakdown and statutory approval signatures follow on the next dedicated budget page.`
+          }
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Screen-only divider (hidden during print) -->
+    <hr class="ksac-screen-page-divider" />
+
+    <!-- ==================== PAGE 3: INDEPENDENT BUDGET & SIGNATORIES PAGE ==================== -->
+    <div class="ksac-doc-page ksac-budget-standalone-page">
+      ${renderHeader()}
+
+      <div class="ksac-budget-title-block">
+        <div class="ksac-budget-title">
+          OFFICIAL EVENT BUDGET &amp; EXPENDITURE STATEMENT
+        </div>
+        <div class="ksac-budget-subtitle">
+          Annexure: Itemized Financial Sanction &amp; Signatories Matrix
+        </div>
+        <div style="font-size: 10pt; font-weight: bold; margin-top: 4px;">
+          Event: ${proposal.eventName || "Event"} &nbsp;|&nbsp; Society: ${proposal.society || "KSAC"} &nbsp;|&nbsp; Dates: ${proposal.dateDisplay || proposal.startDate || "Upcoming"}
+        </div>
+      </div>
+
+      <!-- Itemized Budget Table -->
+      ${
+        enabled.includes("BUDGET") && Array.isArray(proposal.budgetItems) && proposal.budgetItems.length > 0
+          ? `
+      <div style="margin-bottom: 10px;">
         ${
           proposal.includeGstNote !== false
-            ? `<p style="font-size: 9.5pt; font-style: italic; margin: 0 0 6px 0;">(N.B. The budget distribution provided below is calculated prior to the inclusion of Goods and Services Tax (GST). Applicable GST, in accordance with prevailing Government Regulations, will be added, and the final cost may vary.)</p>`
+            ? `<p style="font-size: 9pt; font-style: italic; margin: 0 0 5px 0;">(N.B. The budget distribution provided below is calculated prior to the inclusion of Goods and Services Tax (GST). Applicable GST, in accordance with prevailing Government Regulations, will be added, and the final cost may vary.)</p>`
             : ""
         }
         <table class="ksac-table">
           <thead>
             <tr>
-              <th style="width: 50px;">Sl No.</th>
+              <th style="width: 45px;">Sl No.</th>
               <th>Particulars</th>
-              <th style="width: 70px;">Quantity</th>
-              <th style="width: 100px;">Pricing</th>
-              <th style="width: 130px;">Tentative Cost (in Rs.)</th>
+              <th style="width: 65px;">Quantity</th>
+              <th style="width: 95px;">Pricing</th>
+              <th style="width: 125px;">Tentative Cost (in Rs.)</th>
             </tr>
           </thead>
           <tbody>
@@ -937,7 +1111,7 @@ export function generateProposalDocumentHtml(
               .join("")}
             <tr>
               <td colspan="4" style="text-align: right; font-weight: bold;">Total Amount</td>
-              <td style="text-align: right; font-weight: bold;">₹ ${formatIndianCurrency(
+              <td style="text-align: right; font-weight: bold;">Rs. ${formatIndianCurrency(
                 budgetTotal
               )}</td>
             </tr>
@@ -945,47 +1119,71 @@ export function generateProposalDocumentHtml(
         </table>
 
         <div class="ksac-budget-highlight">
-          <strong>Grand Total: Rs. ${formatIndianCurrency(budgetTotal)}/-</strong><br />
+          <strong>Grand Total Approved Budget: Rs. ${formatIndianCurrency(budgetTotal)}/-</strong><br />
           <strong>In words:</strong> ${budgetWords}
         </div>
+      </div>`
+          : `
+      <div style="border: 1px dashed #94a3b8; padding: 16px; text-align: center; margin-bottom: 12px; font-style: italic;">
+        No separate monetary expenditure requested from KSAC university funds for this event.
+      </div>`
+      }
+
+      <!-- Revenue Model (if enabled) -->
+      ${
+        enabled.includes("REVENUE") && Array.isArray(proposal.revenueItems) && proposal.revenueItems.length > 0
+          ? `
+      <div style="margin-bottom: 10px;">
+        <h4 class="ksac-subsec-title">Revenue Projections &amp; Self-Sponsorship:</h4>
+        <table class="ksac-table">
+          <thead>
+            <tr>
+              <th style="width: 45px;">Sl No.</th>
+              <th>Revenue Source</th>
+              <th style="width: 130px;">Amount Projection</th>
+              <th style="width: 130px;">Total (in Rs.)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${proposal.revenueItems
+              .map(
+                (r: any, idx: number) => `
+            <tr>
+              <td style="text-align: center;">${idx + 1}</td>
+              <td>${r.source || "-"}</td>
+              <td style="text-align: right;">${r.amountFormula || "-"}</td>
+              <td style="text-align: right;">${formatIndianCurrency(r.total || 0)}</td>
+            </tr>`
+              )
+              .join("")}
+            <tr>
+              <td colspan="3" style="text-align: right; font-weight: bold;">Total Projected Revenue</td>
+              <td style="text-align: right; font-weight: bold;">Rs. ${formatIndianCurrency(revenueTotal)}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>`
           : ""
       }
 
-      <!-- 7. Speaker Details -->
+      <!-- Speaker Fee Breakdown (if enabled) -->
       ${
         enabled.includes("SPEAKER") && proposal.speakerDetails?.name
           ? `
-      <div style="margin-bottom: 14px;">
-        <h3 class="ksac-sec-title">${sectionCounter++}. Speaker Details</h3>
-        <div style="font-weight: bold; font-size: 11pt;">${proposal.speakerDetails.name}</div>
+      <div style="margin-bottom: 10px;">
+        <h4 class="ksac-subsec-title">Speaker / Dignitary Honorarium &amp; Logistics:</h4>
+        <div style="font-weight: bold; font-size: 10pt;">${proposal.speakerDetails.name} ${proposal.speakerDetails.title ? `(${proposal.speakerDetails.title})` : ""}</div>
         ${
-          proposal.speakerDetails.title
-            ? `<div style="font-weight: bold; margin-bottom: 4px;">${proposal.speakerDetails.title}</div>`
-            : ""
-        }
-        ${
-          proposal.speakerDetails.bio
-            ? `<p class="ksac-body-p" style="margin: 3px 0 6px 0;">${proposal.speakerDetails.bio}</p>`
-            : ""
-        }
-        ${
-          proposal.speakerDetails.managerContact
-            ? `<div style="margin-bottom: 6px;"><strong>Manager's Contact info :</strong> ${proposal.speakerDetails.managerContact}</div>`
-            : ""
-        }
-        ${
-          Array.isArray(proposal.speakerDetails.feeItems) &&
-          proposal.speakerDetails.feeItems.length > 0
+          Array.isArray(proposal.speakerDetails.feeItems) && proposal.speakerDetails.feeItems.length > 0
             ? `
-        <table class="ksac-table">
+        <table class="ksac-table" style="margin-top: 4px;">
           <thead>
             <tr>
-              <th style="width: 50px;">Sl No.</th>
+              <th style="width: 45px;">Sl No.</th>
               <th>Particulars</th>
-              <th style="width: 70px;">Quantity</th>
-              <th style="width: 100px;">Pricing</th>
-              <th style="width: 130px;">Cost (in Rs.)</th>
+              <th style="width: 65px;">Quantity</th>
+              <th style="width: 95px;">Pricing</th>
+              <th style="width: 125px;">Cost (in Rs.)</th>
             </tr>
           </thead>
           <tbody>
@@ -995,15 +1193,14 @@ export function generateProposalDocumentHtml(
             <tr>
               <td style="text-align: center;">${idx + 1}</td>
               <td>${f.particulars || "-"}</td>
-              <td style="text-align: center;">${f.quantity || "-"}</td>
               <td style="text-align: right;">${formatIndianCurrency(f.pricing || 0)}</td>
               <td style="text-align: right;">${formatIndianCurrency(f.total || 0)}</td>
             </tr>`
               )
               .join("")}
             <tr>
-              <td colspan="4" style="text-align: right; font-weight: bold;">TOTAL</td>
-              <td style="text-align: right; font-weight: bold;">${formatIndianCurrency(
+              <td colspan="4" style="text-align: right; font-weight: bold;">Speaker Total</td>
+              <td style="text-align: right; font-weight: bold;">Rs. ${formatIndianCurrency(
                 proposal.speakerDetails.speakerTotal || 0
               )}</td>
             </tr>
@@ -1015,26 +1212,16 @@ export function generateProposalDocumentHtml(
           : ""
       }
 
-      <!-- 8. Summary & Multi-Signatory Grid (Enclosed together so signatures are never orphaned) -->
-      <div class="ksac-summary-and-signatures">
-        <h3 class="ksac-sec-title">${sectionCounter++}. Summary</h3>
-        <p class="ksac-body-p">
-          ${
-            proposal.summary ||
-            `These arrangements are essential to ensure <strong>${
-              proposal.eventName || "the event"
-            }</strong> runs smoothly and reflects well on <strong>${
-              proposal.society || "KSAC"
-            }</strong>, <strong>KSAC</strong>, and <strong>KIIT Deemed to be University</strong>. We seek KSAC's kind approval and support in executing the above requirements.`
-          }
-        </p>
-
-        <!-- Official Multi-Signatory Footer Grid -->
+      <!-- Official Multi-Signatory Footer Grid (STRICTLY ON THIS SAME BUDGET PAGE) -->
+      <div class="ksac-summary-and-signatures" style="margin-top: 18px;">
+        <div style="font-weight: bold; font-size: 10pt; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px;">
+          Official Requisition &amp; Budget Sanction Signatories:
+        </div>
         <div class="ksac-footer-sig-grid">
           ${(footerSignatories.length > 0
             ? footerSignatories
             : [
-                { roleTitle: "FIC", name: "", designation: `FIC, ${proposal.society || "Society"} KIIT` },
+                { roleTitle: "FIC", name: "", designation: `Faculty In-Charge (FIC)\n${proposal.society || "Society"}` },
                 {
                   roleTitle: "Associate Dean, KSAC",
                   name: "Dr. Ajit Kumar Pasayat",
@@ -1045,7 +1232,7 @@ export function generateProposalDocumentHtml(
                 {
                   roleTitle: "Pro-Vice Chancellor - Cum - Registrar",
                   name: "",
-                  designation: "Pro-Vice Chancellor - Cum - Registrar, KIIT-DU",
+                  designation: "Pro-Vice Chancellor (Admin)-cum-Registrar, KIIT-DU",
                 },
               ]
           )
@@ -1070,7 +1257,6 @@ export function generateProposalDocumentHtml(
     autoPrint
       ? `<script>
     window.onload = function() {
-      // Allow browser to settle fonts & images before launching print
       setTimeout(function() {
         window.focus();
         window.print();

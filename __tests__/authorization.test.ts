@@ -1,10 +1,13 @@
-﻿import { test } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import { isAuthorizedForEventProposal } from "../lib/eventProposalPresets";
 
 test("isAuthorizedForEventProposal allows Dean, Admin, Presidents, and Vice-Presidents", () => {
   // Dean KSAC
   assert.equal(isAuthorizedForEventProposal({ role: "dean" }), true);
+
+  // FIC (Faculty In-Charge)
+  assert.equal(isAuthorizedForEventProposal({ role: "fic" }), true);
 
   // Admin
   assert.equal(isAuthorizedForEventProposal({ role: "admin" }), true);

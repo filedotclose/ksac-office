@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+﻿import mongoose from "mongoose";
 
 const subEventSchema = new mongoose.Schema(
   {
@@ -15,8 +15,8 @@ const budgetItemSchema = new mongoose.Schema(
   {
     slNo: { type: Number, required: true },
     particulars: { type: String, required: true },
-    quantity: { type: String, required: true }, // Supports "85", "4 + 4", "18%" etc. as seen in KATADIGM & OMEGA
-    unitPrice: { type: String, required: true }, // Supports "120", "60/pc", "216/sq.ft."
+    quantity: { type: String, required: true },
+    unitPrice: { type: String, required: true },
     totalCost: { type: Number, required: true, default: 0 },
     category: { type: String, default: "FINANCE" },
   },
@@ -27,7 +27,7 @@ const revenueItemSchema = new mongoose.Schema(
   {
     slNo: { type: Number, required: true },
     source: { type: String, required: true },
-    amountFormula: { type: String, required: true }, // e.g., "200x1000" or "50000"
+    amountFormula: { type: String, required: true },
     total: { type: Number, required: true, default: 0 },
   },
   { _id: false }
@@ -49,7 +49,7 @@ const venueRequirementSchema = new mongoose.Schema(
     date: { type: String, required: true },
     campus: { type: String, required: true },
     timings: { type: String, default: "" },
-    venueType: { type: String, required: true }, // e.g. Lecture Hall, Classroom, Auditorium
+    venueType: { type: String, required: true },
     quantity: { type: Number, default: 1 },
     details: { type: String, default: "" },
     departmentCategory: { type: String, default: "VENUE" },
@@ -93,11 +93,56 @@ const marketingRequirementSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const securityRequirementSchema = new mongoose.Schema(
+  {
+    date: { type: String, default: "" },
+    timings: { type: String, default: "" },
+    venue: { type: String, default: "" },
+    guardsCount: { type: String, default: "2" },
+    femaleGuardsCount: { type: String, default: "1" },
+    barricadingRequired: { type: Boolean, default: false },
+    crowdControlDetails: { type: String, default: "" },
+    entryGateControl: { type: String, default: "Valid KIIT ID Card check" },
+    nightSecurityRequired: { type: Boolean, default: false },
+    details: { type: String, default: "" },
+    departmentCategory: { type: String, default: "SECURITY" },
+  },
+  { _id: false }
+);
+
+const felicitationRequirementSchema = new mongoose.Schema(
+  {
+    slNo: { type: Number, default: 1 },
+    particulars: { type: String, required: true }, // e.g. "Shawl", "Silver Filigree Memento", "Floral Bouquet"
+    recipient: { type: String, default: "" }, // e.g. "Chief Guest", "Keynote Speaker"
+    quantity: { type: String, default: "1" },
+    unitPrice: { type: String, default: "0" },
+    totalCost: { type: Number, default: 0 },
+    departmentCategory: { type: String, default: "FOOD" },
+  },
+  { _id: false }
+);
+
+const sponsorItemSchema = new mongoose.Schema(
+  {
+    slNo: { type: Number, default: 1 },
+    sponsorName: { type: String, required: true },
+    category: { type: String, default: "Title Sponsor" },
+    sponsorshipAmount: { type: Number, default: 0 },
+    deliverables: { type: String, default: "" },
+    mouSigned: { type: Boolean, default: false },
+    mouFileName: { type: String, default: "" },
+    mouDataUrl: { type: String, default: "" },
+    mouMimeType: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
 const signatoryBlockSchema = new mongoose.Schema(
   {
-    roleTitle: { type: String, required: true }, // e.g. "FIC, FED KIIT" or "Associate Dean, KSAC"
-    name: { type: String, default: "" }, // e.g. "Dr. Ajit Kumar Pasayat"
-    designation: { type: String, default: "" }, // e.g. "Assoc. Dean (KSAC-Tech)"
+    roleTitle: { type: String, required: true },
+    name: { type: String, default: "" },
+    designation: { type: String, default: "" },
     location: {
       type: String,
       enum: ["NOTESHEET", "FOOTER", "BOTH"],
@@ -139,7 +184,10 @@ const eventProposalSchema = new mongoose.Schema({
   studentRollNo: { type: String, required: true },
   society: { type: String, required: true },
   societyFullName: { type: String, default: "" },
-  position: { type: String, required: true }, // "President" | "Vice-President"
+  position: { type: String, required: true },
+
+  // Linked Pre-proposal Rough Request
+  roughRequestId: { type: mongoose.Schema.Types.ObjectId, ref: "roughEventRequest" },
 
   // Notesheet & Core Event Metadata
   eventName: { type: String, required: true },
@@ -149,10 +197,10 @@ const eventProposalSchema = new mongoose.Schema({
     enum: ["OFFLINE", "ONLINE", "HYBRID"],
     default: "OFFLINE",
   },
-  startDate: { type: String, required: true }, // YYYY-MM-DD
-  endDate: { type: String, required: true }, // YYYY-MM-DD
-  dateDisplay: { type: String, required: true }, // e.g. "22nd - 23rd August 2026"
-  submissionDate: { type: String, required: true }, // e.g. "03rd August 2026"
+  startDate: { type: String, required: true },
+  endDate: { type: String, required: true },
+  dateDisplay: { type: String, required: true },
+  submissionDate: { type: String, required: true },
   venueCampus: { type: String, default: "Campus 25" },
   ocHeadcount: { type: Number, default: 30 },
   notesheetRecipient: {
@@ -167,10 +215,20 @@ const eventProposalSchema = new mongoose.Schema({
   eventFormatSummary: { type: String, default: "" },
   summary: { type: String, default: "" },
 
-  // Dropdown-enabled section keys
+  // Enabled Sections
   enabledSections: {
     type: [String],
-    default: ["SUB_EVENTS", "GUIDELINES", "BUDGET", "VENUE", "TECHNICAL", "MARKETING"],
+    default: [
+      "SUB_EVENTS",
+      "GUIDELINES",
+      "BUDGET",
+      "VENUE",
+      "TECHNICAL",
+      "MARKETING",
+      "SECURITY",
+      "FELICITATION",
+      "SPONSORS",
+    ],
   },
 
   // Dynamic Sections
@@ -200,35 +258,85 @@ const eventProposalSchema = new mongoose.Schema({
     speakerTotal: { type: Number, default: 0 },
   },
 
-  // Department-mapped Requirement Tables
+  // Department-mapped Requirements
   venueRequirements: { type: [venueRequirementSchema], default: [] },
   technicalRequirements: { type: [technicalRequirementSchema], default: [] },
   foodRequirements: { type: [foodRequirementSchema], default: [] },
   marketingRequirements: { type: [marketingRequirementSchema], default: [] },
+  securityRequirements: { type: [securityRequirementSchema], default: [] },
+  felicitationRequirements: { type: [felicitationRequirementSchema], default: [] },
 
-  // Dynamic Signatories (President/VP or Dean can add/remove)
+  // Sponsors & MoU
+  sponsors: { type: [sponsorItemSchema], default: [] },
+
+  // Promotional Uploads & Branding
+  bannerDetails: {
+    format: { type: String, default: "Stage Backdrop 12x8 ft" },
+    dimensions: { type: String, default: "12x8 ft" },
+    material: { type: String, default: "Star Flex" },
+    fileName: { type: String, default: "" },
+    dataUrl: { type: String, default: "" },
+    mimeType: { type: String, default: "" },
+  },
+  posterDetails: {
+    format: { type: String, default: "A3 Physical Print" },
+    fileName: { type: String, default: "" },
+    dataUrl: { type: String, default: "" },
+    mimeType: { type: String, default: "" },
+  },
+  societyLogo: {
+    fileName: { type: String, default: "" },
+    dataUrl: { type: String, default: "" },
+    mimeType: { type: String, default: "" },
+  },
+
+  // Signatories
   signatories: { type: [signatoryBlockSchema], default: [] },
 
-  // Dean KSAC Controller State & Department Emails
-  departmentMails: { type: [departmentMailLogSchema], default: [] },
+  // Multi-tier Approval Pipeline: Student -> FIC -> Dean KSAC
   status: {
     type: String,
     enum: [
       "DRAFT",
       "SUBMITTED",
+      "PENDING_FIC",
+      "REVISION_REQUESTED_FIC",
+      "PENDING_DEAN",
+      "REVISION_REQUESTED_DEAN",
       "REVISION_REQUESTED",
       "APPROVED",
       "SIGNED_SOFTCOPY_SUBMITTED",
       "COMPLETED",
       "REJECTED",
     ],
-    default: "SUBMITTED",
+    default: "PENDING_FIC",
   },
+
+  // FIC Approval Details
+  ficApproval: {
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "user" },
+    ficName: { type: String, default: "" },
+    approvedAt: { type: Date },
+    remarks: { type: String, default: "" },
+    status: { type: String, default: "PENDING" },
+  },
+
+  // Dean KSAC Approval Details
+  deanApproval: {
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "user" },
+    deanName: { type: String, default: "" },
+    approvedAt: { type: Date },
+    remarks: { type: String, default: "" },
+  },
+
   deanNote: { type: String, default: "" },
   approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "user" },
   approvedAt: { type: Date },
 
-  // Final Signed Hardcopy Scan uploaded back by President/VP
+  // Department Email Logs
+  departmentMails: { type: [departmentMailLogSchema], default: [] },
+
+  // Final Scanned Hardcopy
   signedSoftcopy: {
     fileName: { type: String, default: "" },
     mimeType: { type: String, default: "" },
@@ -246,6 +354,7 @@ const eventProposalSchema = new mongoose.Schema({
 eventProposalSchema.index({ studentId: 1, createdAt: -1 });
 eventProposalSchema.index({ society: 1, status: 1 });
 eventProposalSchema.index({ status: 1, createdAt: -1 });
+eventProposalSchema.index({ roughRequestId: 1 });
 
 export default mongoose.models.eventProposal ||
   mongoose.model("eventProposal", eventProposalSchema);

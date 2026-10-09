@@ -6,7 +6,15 @@ import { formatIndianCurrency, numberToIndianRupeeWords } from "@/lib/eventPropo
 import EventProposalDocument from "./EventProposalDocument";
 
 export default function DeanEventController() {
-  const [subTab, setSubTab] = useState<"proposals" | "directory">("proposals");
+  const [subTab, setSubTab] = useState<"proposals" | "rough_requests" | "budget_table" | "society_files" | "directory">("proposals");
+  const [roughRequests, setRoughRequests] = useState<any[]>([]);
+  const [budgets, setBudgets] = useState<any[]>([]);
+  const [totalSanctioned, setTotalSanctioned] = useState<number>(0);
+  const [totalRevenue, setTotalRevenue] = useState<number>(0);
+  const [societyFiles, setSocietyFiles] = useState<any[]>([]);
+  const [roughRemarks, setRoughRemarks] = useState<string>("");
+  const [fileTypeFilter, setFileTypeFilter] = useState<string>("ALL");
+  const [fileSocietyFilter, setFileSocietyFilter] = useState<string>("ALL");
   const [proposals, setProposals] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +75,26 @@ export default function DeanEventController() {
           setDepartments(res.data.departments);
         }
       }
+
+      // Fetch Rough Requests
+      const roughRes = await dispatchGateway<{ requests: any[] }>(GATEWAY_OPCODES.FETCH_ROUGH_REQUESTS);
+      if (roughRes.ok && roughRes.data?.requests) {
+        setRoughRequests(roughRes.data.requests);
+      }
+
+      // Fetch Budgets Table
+      const budRes = await dispatchGateway<{ budgets: any[]; totalSanctionedBudget: number; totalProjectedRevenue: number }>(GATEWAY_OPCODES.FETCH_EVENT_BUDGETS);
+      if (budRes.ok && budRes.data) {
+        setBudgets(budRes.data.budgets || []);
+        setTotalSanctioned(budRes.data.totalSanctionedBudget || 0);
+        setTotalRevenue(budRes.data.totalProjectedRevenue || 0);
+      }
+
+      // Fetch Society Files
+      const fileRes = await dispatchGateway<{ files: any[] }>(GATEWAY_OPCODES.FETCH_SOCIETY_FILES);
+      if (fileRes.ok && fileRes.data?.files) {
+        setSocietyFiles(fileRes.data.files);
+      }
     } catch (err) {
       console.error("Failed to fetch Dean event proposals:", err);
     } finally {
@@ -95,6 +123,25 @@ export default function DeanEventController() {
       }
     }
   }, [activeProposal, selectedMailIdx]);
+
+  const handleRoughRequestAction = async (requestId: string, action: "APPROVE" | "DISAPPROVE" | "WAITING") => {
+    try {
+      const res = await dispatchGateway(GATEWAY_OPCODES.ACTION_ROUGH_REQUEST, {
+        requestId,
+        action,
+        reviewRemarks: roughRemarks,
+      });
+      if (res.ok) {
+        setToast({ type: "success", text: `Rough request marked as ${action}.` });
+        setRoughRemarks("");
+        fetchAll();
+      } else {
+        setToast({ type: "error", text: res.message || "Failed to update rough request." });
+      }
+    } catch (err: any) {
+      setToast({ type: "error", text: err.message || "Action failed." });
+    }
+  };
 
   const handleOpenProposal = (p: any, mode: "overview" | "document" | "mails" | "signatories" | "softcopy" = "overview") => {
     setActiveProposal(p);
@@ -336,7 +383,7 @@ export default function DeanEventController() {
                 setActiveProposal(null);
                 setSubTab("proposals");
               }}
-              className={`rounded-2xl px-4 py-2.5 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 ${
+              className={`rounded-2xl px-4 py-2.5 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ${
                 subTab === "proposals"
                   ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
                   : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
@@ -348,15 +395,57 @@ export default function DeanEventController() {
               type="button"
               onClick={() => {
                 setActiveProposal(null);
+                setSubTab("rough_requests");
+              }}
+              className={`rounded-2xl px-4 py-2.5 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ${
+                subTab === "rough_requests"
+                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+                  : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              <span>⚡</span> Rough Requests ({roughRequests.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveProposal(null);
+                setSubTab("budget_table");
+              }}
+              className={`rounded-2xl px-4 py-2.5 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ${
+                subTab === "budget_table"
+                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+                  : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              <span>💰</span> Budget Ledger ({budgets.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveProposal(null);
+                setSubTab("society_files");
+              }}
+              className={`rounded-2xl px-4 py-2.5 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ${
+                subTab === "society_files"
+                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+                  : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              <span>📁</span> Society Files ({societyFiles.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveProposal(null);
                 setSubTab("directory");
               }}
-              className={`rounded-2xl px-4 py-2.5 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 ${
+              className={`rounded-2xl px-4 py-2.5 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ${
                 subTab === "directory"
                   ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
                   : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
               }`}
             >
-              <span>🏢</span> Department Directory ({departments.length})
+              <span>🏛️</span> Department Directory ({departments.length})
             </button>
           </div>
         </div>
@@ -1539,6 +1628,270 @@ export default function DeanEventController() {
           )}
         </div>
       )}
+
+            {/* ==================== SUB-TAB: ROUGH PRE-REQUESTS ==================== */}
+      {subTab === "rough_requests" && (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h2 className="text-base font-black text-slate-900">Pre-Proposal Rough Requests Queue</h2>
+              <p className="text-xs text-slate-500">Rapid review of concept, date, and estimated budget before official notesheet compilation.</p>
+            </div>
+            <button
+              type="button"
+              onClick={fetchAll}
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition"
+            >
+              Refresh
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-700">Dean Review Remarks / Note (Applied on action):</label>
+            <input
+              type="text"
+              value={roughRemarks}
+              onChange={(e) => setRoughRemarks(e.target.value)}
+              placeholder="e.g. Approved. Dates verified with central auditorium schedule."
+              className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-emerald-500"
+            />
+          </div>
+
+          {roughRequests.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 font-bold text-xs">No rough requests submitted yet.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-black">
+                    <th className="p-3">Event Name</th>
+                    <th className="p-3">Society</th>
+                    <th className="p-3">Date</th>
+                    <th className="p-3">Rough Budget</th>
+                    <th className="p-3">Lead Coordinator</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Dean Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {roughRequests.map((r) => (
+                    <tr key={r._id} className="hover:bg-slate-50/60">
+                      <td className="p-3 font-bold text-slate-900">{r.eventName}</td>
+                      <td className="p-3">{r.society}</td>
+                      <td className="p-3">{r.eventDate}</td>
+                      <td className="p-3 font-mono font-bold text-emerald-700">Rs. {formatIndianCurrency(r.estimatedBudget || 0)}/-</td>
+                      <td className="p-3">{r.studentName} ({r.position || "Lead"})</td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                            r.status === "APPROVED"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : r.status === "DISAPPROVED"
+                              ? "bg-rose-100 text-rose-800"
+                              : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {r.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleRoughRequestAction(r._id, "APPROVE")}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition cursor-pointer"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRoughRequestAction(r._id, "DISAPPROVE")}
+                            className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-bold hover:bg-rose-700 transition cursor-pointer"
+                          >
+                            Disapprove
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRoughRequestAction(r._id, "WAITING")}
+                            className="px-2.5 py-1 rounded-lg bg-slate-200 text-slate-700 font-bold hover:bg-slate-300 transition cursor-pointer"
+                          >
+                            Waiting
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==================== SUB-TAB: BUDGET TABLE LEDGER ==================== */}
+      {subTab === "budget_table" && (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+            <div>
+              <h2 className="text-base font-black text-slate-900">Event Budgets Ledger &amp; Allocation</h2>
+              <p className="text-xs text-slate-500">Institutional tracking of sanctioned event budgets, revenue models, and expenditure breakdowns.</p>
+            </div>
+            <button
+              type="button"
+              onClick={fetchAll}
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition"
+            >
+              Refresh Ledger
+            </button>
+          </div>
+
+          {/* Metric Overview Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+              <span className="block text-xs font-bold uppercase text-emerald-800">Total Sanctioned Budget</span>
+              <span className="text-2xl font-black font-mono text-emerald-700">Rs. {formatIndianCurrency(totalSanctioned)}/-</span>
+            </div>
+            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4">
+              <span className="block text-xs font-bold uppercase text-indigo-800">Total Projected Revenue</span>
+              <span className="text-2xl font-black font-mono text-indigo-700">Rs. {formatIndianCurrency(totalRevenue)}/-</span>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+              <span className="block text-xs font-bold uppercase text-slate-700">Tracked Budget Records</span>
+              <span className="text-2xl font-black text-slate-800">{budgets.length} Events</span>
+            </div>
+          </div>
+
+          {budgets.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 font-bold text-xs">No event budgets recorded yet.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-black">
+                    <th className="p-3">Event Name</th>
+                    <th className="p-3">Society</th>
+                    <th className="p-3">Academic Year</th>
+                    <th className="p-3">Budget Total</th>
+                    <th className="p-3">Budget in Words</th>
+                    <th className="p-3">Revenue Total</th>
+                    <th className="p-3">Items Count</th>
+                    <th className="p-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {budgets.map((b) => (
+                    <tr key={b._id} className="hover:bg-slate-50/60">
+                      <td className="p-3 font-bold text-slate-900">{b.eventName}</td>
+                      <td className="p-3">{b.society}</td>
+                      <td className="p-3 text-slate-500">{b.academicYear || "2025-2026"}</td>
+                      <td className="p-3 font-mono font-bold text-emerald-700">Rs. {formatIndianCurrency(b.budgetTotal || 0)}/-</td>
+                      <td className="p-3 text-[11px] text-slate-500 max-w-xs truncate">{b.budgetInWords}</td>
+                      <td className="p-3 font-mono text-slate-700">Rs. {formatIndianCurrency(b.revenueTotal || 0)}/-</td>
+                      <td className="p-3 font-bold text-slate-600">{b.itemsCount || 0}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-bold text-[10px]">
+                          {b.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==================== SUB-TAB: SOCIETY FILE VAULT ==================== */}
+      {subTab === "society_files" && (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+            <div>
+              <h2 className="text-base font-black text-slate-900">Society-Wise Administrative File Storage</h2>
+              <p className="text-xs text-slate-500">Access stage backdrops (12x8 ft), posters, signed MoUs, and society logos cataloged by society.</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={fileTypeFilter}
+                onChange={(e) => setFileTypeFilter(e.target.value)}
+                className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-700"
+              >
+                <option value="ALL">All File Types</option>
+                <option value="BANNER">Banners (Stage 12x8, Gate 8x4)</option>
+                <option value="POSTER">Posters (A3, A4, Digital)</option>
+                <option value="MOU">Sponsor MoUs</option>
+                <option value="SOCIETY_LOGO">Society Logos</option>
+                <option value="SIGNED_COPY">Signed Copies</option>
+              </select>
+
+              <button
+                type="button"
+                onClick={fetchAll}
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          {societyFiles.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 font-bold text-xs">No files uploaded across societies yet.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {societyFiles
+                .filter((f) => fileTypeFilter === "ALL" || f.fileType === fileTypeFilter)
+                .map((file) => (
+                  <div
+                    key={file._id}
+                    className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 hover:bg-white transition space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">
+                        {file.fileType}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {file.fileDimensions || file.mimeType}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="font-black text-sm text-slate-900 truncate">{file.fileName}</h4>
+                      <p className="text-xs text-slate-500">
+                        <strong>Society:</strong> {file.society} &bull; {file.eventName || "General Asset"}
+                      </p>
+                    </div>
+
+                    {file.dataUrl && file.dataUrl.startsWith("data:image") ? (
+                      <img
+                        src={file.dataUrl}
+                        alt={file.fileName}
+                        className="w-full h-32 object-contain bg-slate-100 rounded-xl border border-slate-200"
+                      />
+                    ) : (
+                      <div className="w-full h-24 flex items-center justify-center bg-slate-100 rounded-xl border border-slate-200 text-slate-400 text-xs font-bold">
+                        Attached PDF / Document
+                      </div>
+                    )}
+
+                    <div className="pt-2 flex items-center justify-between text-xs">
+                      <a
+                        href={file.dataUrl}
+                        download={file.fileName}
+                        className="text-emerald-600 hover:text-emerald-800 font-bold hover:underline"
+                      >
+                        Download Asset
+                      </a>
+                      <span className="text-slate-400 text-[10px]">{file.uploadedByName}</span>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==================== SUB-TAB 2: DEPARTMENT DIRECTORY MANAGER ==================== */}
 
       {/* ==================== SUB-TAB 2: DEPARTMENT DIRECTORY MANAGER ==================== */}
       {subTab === "directory" && (

@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+﻿import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -7,17 +7,18 @@ const userSchema = new mongoose.Schema({
   passwordHash: { type: String, required: true },
   role: {
     type: String,
-    enum: ["student", "warden", "ksac", "dean", "admin"],
+    enum: ["student", "fic", "dean", "admin", "warden", "ksac", "president", "vice_president"],
     required: true,
   },
+  department: { type: String }, // e.g. "School of Computer Engineering" for FIC
   hostel: {
     type: String,
-    required: true,
     default: "KP-7A",
   },
   isSocietyLead: { type: Boolean, default: false },
   society: { type: String },
-  position: { type: String }, // "President" | "Vice-President"
+  assignedSocieties: { type: [String], default: [] }, // For FIC mentoring specific societies
+  position: { type: String }, // "President" | "Vice-President" | "Faculty In-Charge" | "Dean KSAC"
   allocatedRoom: { type: String },
   societyPositions: [
     {
@@ -32,11 +33,10 @@ const userSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
-// Optimization Indexes
 userSchema.index({ role: 1 });
-userSchema.index({ hostel: 1 });
-userSchema.index({ isSocietyLead: 1 });
+userSchema.index({ email: 1 });
 userSchema.index({ society: 1 });
+userSchema.index({ assignedSocieties: 1 });
 
 if (mongoose.models.user && !mongoose.models.user.schema.path("tokenVersion")) {
   mongoose.models.user.schema.add({ tokenVersion: { type: Number, default: 0 } });

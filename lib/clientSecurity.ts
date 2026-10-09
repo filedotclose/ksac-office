@@ -1,12 +1,9 @@
-/**
+﻿/**
  * Cryptographic & Obfuscation Utilities for Anti-Reverse Engineering & Network Masking
  */
 
 const PROTOCOL_SIG_SALT = "ksac_rigid_gateway_v2_2026_sig_salt";
 
-/**
- * Fast client/server obfuscator to prevent plain-text schema inspection in DevTools.
- */
 export function obfuscatePayload(data: unknown): string {
   try {
     const jsonStr = JSON.stringify(data);
@@ -19,16 +16,11 @@ export function obfuscatePayload(data: unknown): string {
   }
 }
 
-/**
- * Decodes obfuscated payload safely on the server.
- * Rejects tampered strings, invalid base64, or prototype pollution payloads.
- */
 export function deobfuscatePayload<T = any>(encoded: string): T | null {
   try {
     if (typeof encoded !== "string" || !encoded.trim()) {
       return null;
     }
-    // Reject strings with invalid base64 characters
     if (!/^[A-Za-z0-9+/=]+$/.test(encoded.trim())) {
       return null;
     }
@@ -47,10 +39,6 @@ export function deobfuscatePayload<T = any>(encoded: string): T | null {
   }
 }
 
-/**
- * Computes a deterministic 128-bit (32-hex char) integrity signature over Gateway envelope fields.
- * Runs identically in both Browser and Node.js environments to detect any payload/header tampering.
- */
 export function computeGatewaySignature(
   op: string,
   encodedData: string,
@@ -84,9 +72,6 @@ export function computeGatewaySignature(
   return `${p1}${p2}${p3}${p4}`;
 }
 
-/**
- * Verifies the integrity signature of a gateway request.
- */
 export function verifyGatewaySignature(
   op: string,
   encodedData: string,
@@ -101,10 +86,8 @@ export function verifyGatewaySignature(
   return expected === signature;
 }
 
-// In-memory Nonce Cache to prevent Replay Attacks
 const usedNonces = new Set<string>();
 
-// Cleanup stale nonces every 2 minutes
 if (typeof setInterval !== "undefined") {
   const timer = setInterval(() => {
     usedNonces.clear();
@@ -114,13 +97,9 @@ if (typeof setInterval !== "undefined") {
   }
 }
 
-/**
- * Validates request timestamp and anti-replay nonce.
- * Prevents copied curl/Postman requests from being executed repeatedly.
- */
 export function validateGatewayNonce(nonce: string, timestamp: number): { valid: boolean; error?: string } {
   const now = Date.now();
-  const MAX_DRIFT_MS = 60 * 1000; // 60 seconds
+  const MAX_DRIFT_MS = 60 * 1000;
 
   if (!nonce || typeof nonce !== "string" || nonce.length < 8 || nonce.length > 128) {
     return { valid: false, error: "Missing or malformed security nonce." };
@@ -138,9 +117,6 @@ export function validateGatewayNonce(nonce: string, timestamp: number): { valid:
   return { valid: true };
 }
 
-/**
- * Standard Opcodes for the unified Gateway
- */
 export const GATEWAY_OPCODES = {
   FETCH_STUDENT_DASHBOARD: "0x01",
   REQUEST_GATEPASS: "0x02",
@@ -152,7 +128,6 @@ export const GATEWAY_OPCODES = {
   FETCH_WARDEN_PASSES: "0x08",
   FETCH_KSAC_PASSES: "0x09",
   FETCH_ROOM_SLOTS: "0x0A",
-  // Admin & Flow Extension Opcodes
   FETCH_ADMIN_DASHBOARD: "0x0B",
   ADMIN_CREATE_USER: "0x0C",
   ADMIN_UPDATE_USER: "0x0D",
@@ -161,7 +136,6 @@ export const GATEWAY_OPCODES = {
   ADMIN_DELETE_BOOKING: "0x10",
   ADMIN_OVERRIDE_PASS: "0x11",
   ADMIN_OVERRIDE_BOOKING: "0x12",
-  // Dean & Attendance Opcodes
   FETCH_DEAN_DASHBOARD: "0x20",
   CREATE_ATTENDANCE_SESSION: "0x21",
   TOGGLE_LOGIN_LOCK: "0x22",
@@ -170,20 +144,24 @@ export const GATEWAY_OPCODES = {
   CONFIRM_ATTENDANCE: "0x25",
   END_ATTENDANCE_SESSION: "0x26",
   FETCH_ATTENDANCE_STATUS: "0x27",
-  // Event Proposal & Department Mailer Opcodes (President / VP / Dean KSAC)
   FETCH_EVENT_PROPOSALS: "0x30",
   SAVE_EVENT_PROPOSAL: "0x31",
   ACTION_EVENT_PROPOSAL: "0x32",
   SEND_DEPARTMENT_EMAILS: "0x33",
   SAVE_DEPARTMENT_CONFIG: "0x34",
   UPLOAD_SIGNED_SOFTCOPY: "0x35",
+  // Rough Event Request Opcodes
+  FETCH_ROUGH_REQUESTS: "0x36",
+  SAVE_ROUGH_REQUEST: "0x37",
+  ACTION_ROUGH_REQUEST: "0x38",
+  // FIC Stage Action Opcode
+  FIC_ACTION_PROPOSAL: "0x39",
+  // Society Files & Budget Opcodes
+  FETCH_SOCIETY_FILES: "0x3A",
+  SAVE_SOCIETY_FILE: "0x3B",
+  FETCH_EVENT_BUDGETS: "0x3C",
 } as const;
 
-/**
- * Generates or retrieves a persistent client device fingerprint hash for single-device binding.
- * Uses deterministic hardware/browser traits so that normal and incognito tabs on the same
- * browser/device produce an identical fingerprint hash even when storage is partitioned.
- */
 export function getClientDeviceFingerprint(): string {
   try {
     if (typeof window !== "undefined") {
@@ -193,7 +171,6 @@ export function getClientDeviceFingerprint(): string {
           return existing;
         }
       } catch {
-        // Ignore storage read errors in strict incognito modes
       }
 
       const nav = typeof navigator !== "undefined" ? (navigator as any) : {};
@@ -236,14 +213,10 @@ export function getClientDeviceFingerprint(): string {
       try {
         window.localStorage?.setItem("ksac_device_fp", fp);
       } catch {
-        // Ignore storage write errors in strict incognito modes
       }
       return fp;
     }
   } catch {
-    // Fallback if window is unavailable
   }
   return "dev_node_env_fingerprint";
 }
-
-

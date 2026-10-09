@@ -1,4 +1,4 @@
-﻿import mongoose from "mongoose";
+import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import path from "path";
@@ -38,6 +38,7 @@ async function seed() {
 
   const passwordHash = await bcrypt.hash("Password@123", 10);
   const deanPasswordHash = await bcrypt.hash("Dean@123", 10);
+  const ficPasswordHash = await bcrypt.hash("Fic@123", 10);
 
   // 1. Dean KSAC
   const dean = await User.findOneAndUpdate(
@@ -54,7 +55,24 @@ async function seed() {
   );
   console.log("Dean KSAC seeded:", dean.email);
 
-  // 2. Demo Society Presidents
+  // 2. Faculty In-Charge (FIC)
+  const fic = await User.findOneAndUpdate(
+    { email: "fic.cse@kiit.ac.in" },
+    {
+      name: "Dr. Siddharth Swarup Rautaray",
+      email: "fic.cse@kiit.ac.in",
+      passwordHash: ficPasswordHash,
+      role: "fic",
+      position: "Faculty In-Charge",
+      department: "School of Computer Engineering",
+      assignedSocieties: ["Codex", "Web Society", "KIIT Film Society", "Kalakaar", "KSAC"],
+      tokenVersion: 0,
+    },
+    { upsert: true, new: true }
+  );
+  console.log("Faculty In-Charge (FIC) seeded:", fic.email);
+
+  // 3. Demo Society Presidents & VPs
   const demoUsers = [
     {
       name: "Suryansh Das",
@@ -109,6 +127,7 @@ async function seed() {
 
   console.log("Seeding complete! You can login with:");
   console.log("  Dean KSAC: deanksac@kiit.ac.in / Dean@123");
+  console.log("  FIC (Faculty In-Charge): fic.cse@kiit.ac.in / Fic@123");
   console.log("  Film Society President: president.film@kiit.ac.in / Password@123");
 
   await mongoose.disconnect();

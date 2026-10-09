@@ -1,9 +1,9 @@
-export type Role = "student" | "warden" | "ksac" | "dean" | "admin";
+﻿export type Role = "student" | "fic" | "dean" | "admin" | "warden" | "ksac" | "president" | "vice_president";
 
 export interface ISocietyPosition {
   society: string;
   position: "President" | "Vice-President" | string;
-  allocatedRoom: string;
+  allocatedRoom?: string;
 }
 
 export interface IUser {
@@ -12,9 +12,11 @@ export interface IUser {
   rollNo: string;
   email: string;
   role: Role;
+  department?: string;
   hostel?: string;
   isSocietyLead?: boolean;
   society?: string;
+  assignedSocieties?: string[];
   position?: string;
   allocatedRoom?: string;
   societyPositions?: ISocietyPosition[];

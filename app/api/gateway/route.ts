@@ -1,8 +1,11 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { getUserFromToken } from "@/lib/auth";
 import EventProposal from "@/models/EventProposal";
 import DepartmentConfig from "@/models/DepartmentConfig";
+import RoughEventRequest from "@/models/RoughEventRequest";
+import EventBudget from "@/models/EventBudget";
+import SocietyFile from "@/models/SocietyFile";
 import {
   deobfuscatePayload,
   verifyGatewaySignature,
@@ -24,6 +27,147 @@ async function ensureDepartmentDirectory() {
   if (existing.length > 0) return existing;
   await DepartmentConfig.insertMany(DEFAULT_DEPARTMENT_DIRECTORY);
   return await DepartmentConfig.find({}).sort({ categoryKey: 1 }).lean();
+}
+
+async function syncEventBudget(proposal: any) {
+  if (!proposal) return;
+  try {
+    const categoryBreakdown: Record<string, number> = {};
+    if (Array.isArray(proposal.budgetItems)) {
+      for (const item of proposal.budgetItems) {
+        const cat = item.category || "GENERAL";
+        categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + (Number(item.totalCost) || 0);
+      }
+    }
+
+    await EventBudget.findOneAndUpdate(
+      { proposalId: proposal._id },
+      {
+        proposalId: proposal._id,
+        eventName: proposal.eventName,
+        society: proposal.society,
+        academicYear: proposal.academicYear || "2025-2026",
+        budgetTotal: proposal.budgetTotal || 0,
+        budgetInWords: proposal.budgetInWords || "",
+        revenueTotal: proposal.revenueTotal || 0,
+        status: proposal.status,
+        itemsCount: Array.isArray(proposal.budgetItems) ? proposal.budgetItems.length : 0,
+        categoryBreakdown,
+      },
+      { upsert: true, new: true }
+    );
+  } catch (err) {
+    console.error("Failed to sync EventBudget table:", err);
+  }
+}
+
+async function syncSocietyFilesFromProposal(proposal: any, user: any) {
+  if (!proposal || !proposal.society) return;
+  const society = proposal.society;
+
+  try {
+    // 1. Banner
+    if (proposal.bannerDetails?.dataUrl && proposal.bannerDetails?.fileName) {
+      await SocietyFile.findOneAndUpdate(
+        { proposalId: proposal._id, fileType: "BANNER" },
+        {
+          society,
+          proposalId: proposal._id,
+          eventName: proposal.eventName,
+          fileType: "BANNER",
+          fileName: proposal.bannerDetails.fileName,
+          mimeType: proposal.bannerDetails.mimeType || "image/png",
+          fileDimensions: proposal.bannerDetails.dimensions || proposal.bannerDetails.format || "12x8 ft",
+          dataUrl: proposal.bannerDetails.dataUrl,
+          uploadedById: user._id,
+          uploadedByName: user.name,
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    // 2. Poster
+    if (proposal.posterDetails?.dataUrl && proposal.posterDetails?.fileName) {
+      await SocietyFile.findOneAndUpdate(
+        { proposalId: proposal._id, fileType: "POSTER" },
+        {
+          society,
+          proposalId: proposal._id,
+          eventName: proposal.eventName,
+          fileType: "POSTER",
+          fileName: proposal.posterDetails.fileName,
+          mimeType: proposal.posterDetails.mimeType || "image/png",
+          fileDimensions: proposal.posterDetails.format || "A3 Physical Print",
+          dataUrl: proposal.posterDetails.dataUrl,
+          uploadedById: user._id,
+          uploadedByName: user.name,
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    // 3. Society Logo
+    if (proposal.societyLogo?.dataUrl && proposal.societyLogo?.fileName) {
+      await SocietyFile.findOneAndUpdate(
+        { society, fileType: "SOCIETY_LOGO" },
+        {
+          society,
+          fileType: "SOCIETY_LOGO",
+          fileName: proposal.societyLogo.fileName,
+          mimeType: proposal.societyLogo.mimeType || "image/png",
+          dataUrl: proposal.societyLogo.dataUrl,
+          uploadedById: user._id,
+          uploadedByName: user.name,
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    // 4. Sponsors & MoUs
+    if (Array.isArray(proposal.sponsors)) {
+      for (const sp of proposal.sponsors) {
+        if (sp.mouDataUrl && sp.mouFileName) {
+          await SocietyFile.findOneAndUpdate(
+            { proposalId: proposal._id, fileType: "MOU", notes: sp.name },
+            {
+              society,
+              proposalId: proposal._id,
+              eventName: proposal.eventName,
+              fileType: "MOU",
+              fileName: sp.mouFileName,
+              mimeType: sp.mouMimeType || "application/pdf",
+              dataUrl: sp.mouDataUrl,
+              uploadedById: user._id,
+              uploadedByName: user.name,
+              notes: sp.name,
+            },
+            { upsert: true, new: true }
+          );
+        }
+      }
+    }
+
+    // 5. Signed softcopy
+    if (proposal.signedSoftcopy?.dataUrl && proposal.signedSoftcopy?.fileName) {
+      await SocietyFile.findOneAndUpdate(
+        { proposalId: proposal._id, fileType: "SIGNED_COPY" },
+        {
+          society,
+          proposalId: proposal._id,
+          eventName: proposal.eventName,
+          fileType: "SIGNED_COPY",
+          fileName: proposal.signedSoftcopy.fileName,
+          mimeType: proposal.signedSoftcopy.mimeType || "application/pdf",
+          dataUrl: proposal.signedSoftcopy.dataUrl,
+          uploadedById: user._id,
+          uploadedByName: user.name,
+        },
+        { upsert: true, new: true }
+      );
+    }
+  } catch (err) {
+    console.error("Failed to sync SocietyFiles catalog:", err);
+  }
 }
 
 export async function POST(req: Request) {
@@ -86,7 +230,7 @@ export async function POST(req: Request) {
     if (op === GATEWAY_OPCODES.FETCH_EVENT_PROPOSALS) {
       if (!isAuthorizedForEventProposal(user)) {
         return NextResponse.json(
-          { message: "Access restricted: Only Society Presidents, Vice-Presidents, and Dean KSAC are authorized." },
+          { message: "Access restricted: Only Society Presidents, Vice-Presidents, FICs, and Dean KSAC are authorized." },
           { status: 403 }
         );
       }
@@ -96,6 +240,16 @@ export async function POST(req: Request) {
 
       if (user.role === "dean" || user.role === "admin") {
         proposals = await EventProposal.find({}).sort({ createdAt: -1 }).lean();
+      } else if (user.role === "fic") {
+        if (Array.isArray(user.assignedSocieties) && user.assignedSocieties.length > 0) {
+          proposals = await EventProposal.find({
+            society: { $in: user.assignedSocieties },
+          })
+            .sort({ createdAt: -1 })
+            .lean();
+        } else {
+          proposals = await EventProposal.find({}).sort({ createdAt: -1 }).lean();
+        }
       } else {
         const userSocieties = new Set<string>();
         if (user.society) userSocieties.add(user.society);
@@ -123,7 +277,7 @@ export async function POST(req: Request) {
     if (op === GATEWAY_OPCODES.SAVE_EVENT_PROPOSAL) {
       if (!isAuthorizedForEventProposal(user)) {
         return NextResponse.json(
-          { message: "Access restricted: Only Society Presidents, Vice-Presidents, and Dean KSAC can save event proposals." },
+          { message: "Access restricted: Unauthorized to submit proposals." },
           { status: 403 }
         );
       }
@@ -142,7 +296,7 @@ export async function POST(req: Request) {
 
       const enabledSections = Array.isArray(raw.enabledSections)
         ? raw.enabledSections.map((s: any) => String(s).toUpperCase().trim()).filter(Boolean)
-        : ["SUB_EVENTS", "GUIDELINES", "BUDGET", "VENUE", "TECHNICAL", "MARKETING"];
+        : ["SUB_EVENTS", "GUIDELINES", "BUDGET", "VENUE", "TECHNICAL", "MARKETING", "SECURITY", "FELICITATION", "SPONSORS"];
 
       // Sanitize budget items & calculate total
       const budgetItems = Array.isArray(raw.budgetItems)
@@ -229,6 +383,7 @@ export async function POST(req: Request) {
         bio: sanitizeString(rawSpeaker.bio || "", 2000, "Speaker Bio").value,
         managerContact: sanitizeString(rawSpeaker.managerContact || "", 200, "Manager Contact").value,
         feeItems: speakerFeeItems,
+        speakerTotal: speakerFeeItems.reduce((sum: number, it: any) => sum + (Number(it.total) || 0), 0),
       };
 
       const sanitizeReqList = (arr: any[], defaultCat: string) =>
@@ -253,26 +408,84 @@ export async function POST(req: Request) {
       const venueRequirements = sanitizeReqList(raw.venueRequirements, "VENUE");
       const technicalRequirements = sanitizeReqList(raw.technicalRequirements, "TECHNICAL");
       const foodRequirements = sanitizeReqList(raw.foodRequirements, "FOOD");
-      const printingRequirements = sanitizeReqList(raw.printingRequirements, "PRINTING");
-      const prizeRequirements = sanitizeReqList(raw.prizeRequirements, "PRIZES");
-      const securityRequirements = sanitizeReqList(raw.securityRequirements, "SECURITY");
-      const avRequirements = sanitizeReqList(raw.avRequirements, "MEDIA");
+      const marketingRequirements = sanitizeReqList(raw.marketingRequirements, "MARKETING");
 
-      const facultyCoordinators = Array.isArray(raw.facultyCoordinators)
-        ? raw.facultyCoordinators
-            .map((fc: any) => {
-              const name = sanitizeString(fc.name, 120, "Faculty Name").value;
-              if (!name) return null;
+      // Security requirements
+      const securityRequirements = Array.isArray(raw.securityRequirements)
+        ? raw.securityRequirements
+            .map((s: any) => {
+              if (!s) return null;
               return {
-                name,
-                designation: sanitizeString(fc.designation || "Faculty Coordinator", 120, "Designation").value,
-                department: sanitizeString(fc.department || "", 120, "Department").value,
-                phone: sanitizeString(fc.phone || "", 40, "Phone").value,
-                email: sanitizeString(fc.email || "", 120, "Email").value,
+                date: sanitizeString(s.date || "", 60, "Date").value,
+                timings: sanitizeString(s.timings || "", 80, "Timings").value,
+                campus: sanitizeString(s.campus || "", 60, "Campus").value,
+                securityType: sanitizeString(s.securityType || s.item || "Security Guards", 100, "Security Type").value,
+                quantity: Number(s.quantity) || 1,
+                details: sanitizeString(s.details || "", 500, "Details").value,
               };
             })
             .filter(Boolean)
         : [];
+
+      // Felicitation requirements
+      const felicitationRequirements = Array.isArray(raw.felicitationRequirements)
+        ? raw.felicitationRequirements
+            .map((f: any) => {
+              if (!f) return null;
+              return {
+                date: sanitizeString(f.date || "", 60, "Date").value,
+                item: sanitizeString(f.item || "", 120, "Item").value,
+                quantity: Number(f.quantity) || 1,
+                recipientDignitary: sanitizeString(f.recipientDignitary || "", 140, "Recipient").value,
+                details: sanitizeString(f.details || "", 500, "Details").value,
+              };
+            })
+            .filter(Boolean)
+        : [];
+
+      // Sponsors & MoU
+      const sponsors = Array.isArray(raw.sponsors)
+        ? raw.sponsors
+            .map((sp: any) => {
+              if (!sp) return null;
+              const name = sanitizeString(sp.name || "", 120, "Sponsor Name").value;
+              if (!name) return null;
+              return {
+                name,
+                tier: sanitizeString(sp.tier || "Associate Partner", 80, "Tier").value,
+                contributionAmount: Number(sp.contributionAmount) || 0,
+                mouFileName: sanitizeString(sp.mouFileName || "", 200, "MoU Name").value,
+                mouDataUrl: typeof sp.mouDataUrl === "string" && sp.mouDataUrl.startsWith("data:") ? sp.mouDataUrl : "",
+                mouMimeType: sanitizeString(sp.mouMimeType || "application/pdf", 100, "MIME").value,
+                contactPerson: sanitizeString(sp.contactPerson || "", 120, "Contact").value,
+                contactEmail: sanitizeString(sp.contactEmail || "", 120, "Email").value,
+              };
+            })
+            .filter(Boolean)
+        : [];
+
+      // Banners, Posters & Society Logo
+      const bannerDetails = {
+        format: sanitizeString(raw.bannerDetails?.format || "Stage Backdrop 12x8 ft", 100, "Banner Format").value,
+        dimensions: sanitizeString(raw.bannerDetails?.dimensions || "12x8 ft", 60, "Dimensions").value,
+        material: sanitizeString(raw.bannerDetails?.material || "Star Flex", 60, "Material").value,
+        fileName: sanitizeString(raw.bannerDetails?.fileName || "", 200, "Banner File").value,
+        dataUrl: typeof raw.bannerDetails?.dataUrl === "string" && raw.bannerDetails.dataUrl.startsWith("data:") ? raw.bannerDetails.dataUrl : "",
+        mimeType: sanitizeString(raw.bannerDetails?.mimeType || "image/png", 80, "MIME").value,
+      };
+
+      const posterDetails = {
+        format: sanitizeString(raw.posterDetails?.format || "A3 Physical Print", 100, "Poster Format").value,
+        fileName: sanitizeString(raw.posterDetails?.fileName || "", 200, "Poster File").value,
+        dataUrl: typeof raw.posterDetails?.dataUrl === "string" && raw.posterDetails.dataUrl.startsWith("data:") ? raw.posterDetails.dataUrl : "",
+        mimeType: sanitizeString(raw.posterDetails?.mimeType || "image/png", 80, "MIME").value,
+      };
+
+      const societyLogo = {
+        fileName: sanitizeString(raw.societyLogo?.fileName || "", 200, "Logo File").value,
+        dataUrl: typeof raw.societyLogo?.dataUrl === "string" && raw.societyLogo.dataUrl.startsWith("data:") ? raw.societyLogo.dataUrl : "",
+        mimeType: sanitizeString(raw.societyLogo?.mimeType || "image/png", 80, "MIME").value,
+      };
 
       const signatories = Array.isArray(raw.signatories)
         ? raw.signatories
@@ -293,18 +506,28 @@ export async function POST(req: Request) {
       const userPos =
         user.societyPositions?.find((sp: any) => sp.society === (societyCheck.value || user.society))?.position ||
         user.position ||
-        (user.role === "dean" ? "Dean KSAC" : "President");
+        (user.role === "dean" ? "Dean KSAC" : user.role === "fic" ? "Faculty In-Charge" : "President");
+
+      const roughRequestId = raw.roughRequestId && isValidMongoId(raw.roughRequestId) ? raw.roughRequestId : undefined;
 
       const proposalData = {
         eventName: eventNameCheck.value,
+        tagline: sanitizeString(raw.tagline || "", 160, "Tagline").value,
         society: societyCheck.value,
-        academicYear: sanitizeString(raw.academicYear || "2025-2026", 40, "Academic Year").value,
-        datesDisplay: sanitizeString(raw.datesDisplay || "", 100, "Dates Display").value,
+        societyFullName: sanitizeString(raw.societyFullName || "", 160, "Full Society Name").value,
+        eventMode: ["OFFLINE", "ONLINE", "HYBRID"].includes(raw.eventMode) ? raw.eventMode : "OFFLINE",
+        startDate: sanitizeString(raw.startDate || "2026-10-25", 40, "Start Date").value,
+        endDate: sanitizeString(raw.endDate || "2026-10-26", 40, "End Date").value,
+        dateDisplay: sanitizeString(raw.dateDisplay || raw.datesDisplay || "", 100, "Dates Display").value,
+        submissionDate: sanitizeString(raw.submissionDate || "", 60, "Submission Date").value,
+        venueCampus: sanitizeString(raw.venueCampus || "Campus 25", 80, "Venue Campus").value,
+        ocHeadcount: Number(raw.ocHeadcount) || 30,
         expectedParticipants: Number(raw.expectedParticipants) || 100,
         background: backgroundCheck.value,
-        rationale: sanitizeString(raw.rationale || "", 4000, "Rationale").value,
-        outcomes: sanitizeString(raw.outcomes || "", 4000, "Outcomes").value,
-        participationGuidelines: sanitizeString(raw.participationGuidelines || "", 4000, "Guidelines").value,
+        guidelines: raw.guidelines || {},
+        objectives: Array.isArray(raw.objectives) ? raw.objectives.map((o: any) => sanitizeString(String(o), 300, "Objective").value).filter(Boolean) : [],
+        eventFormatSummary: sanitizeString(raw.eventFormatSummary || "", 2000, "Format Summary").value,
+        summary: sanitizeString(raw.summary || "", 2000, "Summary").value,
         enabledSections,
         budgetItems,
         budgetTotal,
@@ -316,19 +539,21 @@ export async function POST(req: Request) {
         venueRequirements,
         technicalRequirements,
         foodRequirements,
-        printingRequirements,
-        prizeRequirements,
+        marketingRequirements,
         securityRequirements,
-        avRequirements,
-        facultyCoordinators,
+        felicitationRequirements,
+        sponsors,
+        bannerDetails,
+        posterDetails,
+        societyLogo,
         signatories,
+        roughRequestId,
         notesheetRecipient: sanitizeString(
           raw.notesheetRecipient || "The Pro-Vice Chancellor (Admin)-cum-Registrar\nKIIT-DU",
           300,
           "Notesheet Recipient"
         ).value,
-        notesheetSubject: sanitizeString(raw.notesheetSubject || "", 300, "Notesheet Subject").value,
-        notesheetBody: sanitizeString(raw.notesheetBody || "", 4000, "Notesheet Body").value,
+        notesheetIntro: sanitizeString(raw.notesheetIntro || "", 3000, "Notesheet Intro").value,
         updatedAt: new Date(),
       };
 
@@ -342,7 +567,8 @@ export async function POST(req: Request) {
         departments as any
       );
 
-      const requestedStatus = raw.saveAsDraft === true ? "DRAFT" : "SUBMITTED";
+      // Student submission moves to PENDING_FIC; saveAsDraft stays DRAFT
+      const requestedStatus = raw.saveAsDraft === true ? "DRAFT" : "PENDING_FIC";
 
       let proposalDoc: any;
       if (raw.proposalId && isValidMongoId(raw.proposalId)) {
@@ -360,7 +586,11 @@ export async function POST(req: Request) {
 
         Object.assign(existing, proposalData);
         existing.departmentMails = mergedMails;
-        if (existing.status === "DRAFT" || existing.status === "REVISION_REQUESTED" || existing.status === "SUBMITTED") {
+        if (
+          existing.status === "DRAFT" ||
+          existing.status === "REVISION_REQUESTED_FIC" ||
+          existing.status === "REVISION_REQUESTED"
+        ) {
           existing.status = requestedStatus;
         }
         await existing.save();
@@ -375,9 +605,75 @@ export async function POST(req: Request) {
           departmentMails: synthesizedMails,
           status: requestedStatus,
         });
+
+        if (roughRequestId) {
+          await RoughEventRequest.findByIdAndUpdate(roughRequestId, {
+            convertedToProposalId: proposalDoc._id,
+          });
+        }
       }
 
+      await syncEventBudget(proposalDoc);
+      await syncSocietyFilesFromProposal(proposalDoc, user);
+
       const response = NextResponse.json({ proposal: proposalDoc });
+      setRateLimitHeaders(response.headers, rateLimitResult);
+      return response;
+    }
+
+    // 0x39: FIC ACTION PROPOSAL (Student -> FIC -> Dean)
+    if (op === GATEWAY_OPCODES.FIC_ACTION_PROPOSAL) {
+      if (user.role !== "fic" && user.role !== "dean" && user.role !== "admin") {
+        return NextResponse.json({ message: "Only Faculty In-Charge (FIC) or Admin can execute FIC review." }, { status: 403 });
+      }
+
+      const { proposalId, action, remarks } = payload || {};
+      if (!isValidMongoId(proposalId)) {
+        return NextResponse.json({ message: "Invalid Proposal ID." }, { status: 400 });
+      }
+
+      const proposal = await EventProposal.findById(proposalId);
+      if (!proposal) {
+        return NextResponse.json({ message: "Event proposal not found." }, { status: 404 });
+      }
+
+      const safeRemarks = sanitizeString(remarks || "", 1000, "FIC Remarks").value;
+
+      if (action === "APPROVE") {
+        proposal.status = "PENDING_DEAN"; // Advance to Dean KSAC review stage
+        proposal.ficApproval = {
+          approvedBy: user._id,
+          ficName: user.name,
+          approvedAt: new Date(),
+          remarks: safeRemarks,
+          status: "APPROVED",
+        };
+      } else if (action === "REQUEST_REVISION") {
+        proposal.status = "REVISION_REQUESTED_FIC";
+        proposal.ficApproval = {
+          approvedBy: user._id,
+          ficName: user.name,
+          approvedAt: new Date(),
+          remarks: safeRemarks,
+          status: "REVISION_REQUESTED",
+        };
+      } else if (action === "REJECT") {
+        proposal.status = "REJECTED";
+        proposal.ficApproval = {
+          approvedBy: user._id,
+          ficName: user.name,
+          approvedAt: new Date(),
+          remarks: safeRemarks,
+          status: "REJECTED",
+        };
+      }
+
+      proposal.updatedAt = new Date();
+      await proposal.save();
+
+      await syncEventBudget(proposal);
+
+      const response = NextResponse.json({ proposal });
       setRateLimitHeaders(response.headers, rateLimitResult);
       return response;
     }
@@ -422,8 +718,14 @@ export async function POST(req: Request) {
         proposal.status = "APPROVED";
         proposal.approvedBy = user._id;
         proposal.approvedAt = new Date();
+        proposal.deanApproval = {
+          approvedBy: user._id,
+          deanName: user.name,
+          approvedAt: new Date(),
+          remarks: proposal.deanNote || "",
+        };
       } else if (action === "REQUEST_REVISION") {
-        proposal.status = "REVISION_REQUESTED";
+        proposal.status = "REVISION_REQUESTED_DEAN";
       } else if (action === "REJECT") {
         proposal.status = "REJECTED";
       } else if (action === "VERIFY_SOFTCOPY") {
@@ -440,7 +742,181 @@ export async function POST(req: Request) {
       proposal.updatedAt = new Date();
       await proposal.save();
 
+      await syncEventBudget(proposal);
+
       const response = NextResponse.json({ proposal });
+      setRateLimitHeaders(response.headers, rateLimitResult);
+      return response;
+    }
+
+    // 0x36: FETCH ROUGH EVENT REQUESTS
+    if (op === GATEWAY_OPCODES.FETCH_ROUGH_REQUESTS) {
+      let requests: any[] = [];
+      if (user.role === "dean" || user.role === "admin") {
+        requests = await RoughEventRequest.find({}).sort({ createdAt: -1 }).lean();
+      } else if (user.role === "fic") {
+        if (Array.isArray(user.assignedSocieties) && user.assignedSocieties.length > 0) {
+          requests = await RoughEventRequest.find({
+            society: { $in: user.assignedSocieties },
+          })
+            .sort({ createdAt: -1 })
+            .lean();
+        } else {
+          requests = await RoughEventRequest.find({}).sort({ createdAt: -1 }).lean();
+        }
+      } else {
+        const userSocieties = new Set<string>();
+        if (user.society) userSocieties.add(user.society);
+        if (Array.isArray(user.societyPositions)) {
+          user.societyPositions.forEach((sp: any) => {
+            if (sp.society) userSocieties.add(sp.society);
+          });
+        }
+        requests = await RoughEventRequest.find({
+          $or: [
+            { studentId: user._id },
+            { society: { $in: Array.from(userSocieties) } },
+          ],
+        })
+          .sort({ createdAt: -1 })
+          .lean();
+      }
+
+      const response = NextResponse.json({ requests });
+      setRateLimitHeaders(response.headers, rateLimitResult);
+      return response;
+    }
+
+    // 0x37: SAVE ROUGH EVENT REQUEST
+    if (op === GATEWAY_OPCODES.SAVE_ROUGH_REQUEST) {
+      const raw = payload || {};
+      const eventName = sanitizeString(raw.eventName, 180, "Event Name").value;
+      const eventDate = sanitizeString(raw.eventDate, 100, "Event Date").value;
+      const estimatedBudget = Number(raw.estimatedBudget) || 0;
+      const society = sanitizeString(raw.society || user.society || "KSAC Society", 120, "Society").value;
+      const description = sanitizeString(raw.description || "", 2000, "Description").value;
+
+      if (!eventName || !eventDate) {
+        return NextResponse.json({ message: "Event Name and Event Date are required." }, { status: 400 });
+      }
+
+      const created = await RoughEventRequest.create({
+        eventName,
+        eventDate,
+        estimatedBudget,
+        society,
+        description,
+        studentId: user._id,
+        studentName: user.name,
+        studentRollNo: user.rollNo,
+        position: user.position || "President",
+        status: "WAITING",
+      });
+
+      const response = NextResponse.json({ request: created });
+      setRateLimitHeaders(response.headers, rateLimitResult);
+      return response;
+    }
+
+    // 0x38: ACTION ROUGH EVENT REQUEST (Dean / FIC: approve / disapprove / waiting)
+    if (op === GATEWAY_OPCODES.ACTION_ROUGH_REQUEST) {
+      if (user.role !== "dean" && user.role !== "fic" && user.role !== "admin") {
+        return NextResponse.json({ message: "Only Dean or FIC can action rough event requests." }, { status: 403 });
+      }
+
+      const { requestId, action, reviewRemarks } = payload || {};
+      if (!isValidMongoId(requestId)) {
+        return NextResponse.json({ message: "Invalid Request ID." }, { status: 400 });
+      }
+
+      const reqDoc = await RoughEventRequest.findById(requestId);
+      if (!reqDoc) {
+        return NextResponse.json({ message: "Rough event request not found." }, { status: 404 });
+      }
+
+      const normalizedAction = String(action).toUpperCase();
+      let newStatus: "APPROVED" | "DISAPPROVED" | "WAITING" = "WAITING";
+      if (normalizedAction === "APPROVE" || normalizedAction === "APPROVED") {
+        newStatus = "APPROVED";
+      } else if (normalizedAction === "DISAPPROVE" || normalizedAction === "DISAPPROVED") {
+        newStatus = "DISAPPROVED";
+      } else {
+        newStatus = "WAITING";
+      }
+
+      reqDoc.status = newStatus;
+      reqDoc.reviewedBy = user._id;
+      reqDoc.reviewerName = user.name;
+      reqDoc.reviewerRole = user.role as any;
+      reqDoc.reviewRemarks = sanitizeString(reviewRemarks || "", 1000, "Remarks").value;
+      reqDoc.reviewedAt = new Date();
+      await reqDoc.save();
+
+      const response = NextResponse.json({ request: reqDoc });
+      setRateLimitHeaders(response.headers, rateLimitResult);
+      return response;
+    }
+
+    // 0x3A: FETCH SOCIETY FILES
+    if (op === GATEWAY_OPCODES.FETCH_SOCIETY_FILES) {
+      const { society, fileType } = payload || {};
+      const query: any = {};
+      if (society && typeof society === "string" && society !== "ALL") {
+        query.society = society;
+      }
+      if (fileType && typeof fileType === "string" && fileType !== "ALL") {
+        query.fileType = fileType;
+      }
+
+      const files = await SocietyFile.find(query).sort({ createdAt: -1 }).lean();
+      const response = NextResponse.json({ files });
+      setRateLimitHeaders(response.headers, rateLimitResult);
+      return response;
+    }
+
+    // 0x3B: SAVE SOCIETY FILE
+    if (op === GATEWAY_OPCODES.SAVE_SOCIETY_FILE) {
+      const { society, fileType, fileName, mimeType, fileDimensions, dataUrl, notes, proposalId } = payload || {};
+      if (!society || !fileType || !fileName || !dataUrl) {
+        return NextResponse.json({ message: "Society, File Type, File Name and dataUrl are required." }, { status: 400 });
+      }
+
+      const fileDoc = await SocietyFile.create({
+        society: sanitizeString(society, 100, "Society").value,
+        proposalId: isValidMongoId(proposalId) ? proposalId : undefined,
+        fileType,
+        fileName: sanitizeString(fileName, 200, "File Name").value,
+        mimeType: sanitizeString(mimeType || "application/octet-stream", 100, "MIME").value,
+        fileDimensions: sanitizeString(fileDimensions || "", 100, "Dimensions").value,
+        dataUrl,
+        uploadedById: user._id,
+        uploadedByName: user.name,
+        notes: sanitizeString(notes || "", 500, "Notes").value,
+      });
+
+      const response = NextResponse.json({ file: fileDoc });
+      setRateLimitHeaders(response.headers, rateLimitResult);
+      return response;
+    }
+
+    // 0x3C: FETCH EVENT BUDGETS TABLE
+    if (op === GATEWAY_OPCODES.FETCH_EVENT_BUDGETS) {
+      const { society } = payload || {};
+      const query: any = {};
+      if (society && typeof society === "string" && society !== "ALL") {
+        query.society = society;
+      }
+
+      const budgets = await EventBudget.find(query).sort({ createdAt: -1 }).lean();
+      const totalSanctionedBudget = budgets.reduce((acc, b) => acc + (Number(b.budgetTotal) || 0), 0);
+      const totalProjectedRevenue = budgets.reduce((acc, b) => acc + (Number(b.revenueTotal) || 0), 0);
+
+      const response = NextResponse.json({
+        budgets,
+        totalSanctionedBudget,
+        totalProjectedRevenue,
+        count: budgets.length,
+      });
       setRateLimitHeaders(response.headers, rateLimitResult);
       return response;
     }
@@ -553,7 +1029,7 @@ export async function POST(req: Request) {
         }
       }
 
-      if (approveOnSend !== false && (proposal.status === "SUBMITTED" || proposal.status === "REVISION_REQUESTED")) {
+      if (approveOnSend !== false && (proposal.status === "SUBMITTED" || proposal.status === "PENDING_DEAN" || proposal.status === "REVISION_REQUESTED")) {
         proposal.status = "APPROVED";
         proposal.approvedBy = user._id;
         proposal.approvedAt = new Date();
@@ -561,6 +1037,8 @@ export async function POST(req: Request) {
 
       proposal.updatedAt = new Date();
       await proposal.save();
+
+      await syncEventBudget(proposal);
 
       const response = NextResponse.json({
         proposal,
@@ -625,7 +1103,7 @@ export async function POST(req: Request) {
           defaultSubjectTemplate:
             sanitizeString(
               department?.defaultSubjectTemplate ||
-                "KSAC Event Requirement [{category}] — {eventName} ({society}) on {dateDisplay}",
+                "KSAC Event Requirement [{category}] - {eventName} ({society}) on {dateDisplay}",
               300,
               "Subject Template"
             ).value,
@@ -691,6 +1169,9 @@ export async function POST(req: Request) {
       proposal.updatedAt = new Date();
       await proposal.save();
 
+      await syncEventBudget(proposal);
+      await syncSocietyFilesFromProposal(proposal, user);
+
       const response = NextResponse.json({ proposal });
       setRateLimitHeaders(response.headers, rateLimitResult);
       return response;
@@ -699,6 +1180,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: "Unknown opcode." }, { status: 400 });
   } catch (error: any) {
     console.error("Gateway error:", error);
-    return NextResponse.json({ message: "Gateway processing error." }, { status: 500 });
+    return NextResponse.json({ message: "Internal server error." }, { status: 500 });
   }
 }
